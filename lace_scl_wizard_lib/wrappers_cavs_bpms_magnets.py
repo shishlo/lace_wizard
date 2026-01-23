@@ -1,3 +1,10 @@
+
+
+import time
+
+#---- Channel access
+import epics
+
 class Cavity_Wrapper:
     def __init__(self,model_cav,bpm_wrappers):
         #---- Online Model Cavity
@@ -34,13 +41,66 @@ class Cavity_Wrapper:
         self.eKin_in = 185.6
         self.eKin_out = 185.6
         self.eKin_guess = 185.6
+        #---- EPICS connections, PV channels
+        self.is_connected = False
+        pv_name_start = ""
+        if(self.cav.getName().find("SCL") >= 0):
+            pv_name_start = "SCL_LLRF:FCM" + self.cav.getName().split(":")[1].replace("Cav","") + ":"
+        if(self.cav.getName().find("CCL") >= 0):
+            tank_number_str = self.cav.getName()[3]
+            pv_name_start = "CCL_LLRF:FCM" + tank_number_str + ":"
+        self.cav_amp_pv = epics.PV(pv_name_start + "CtlAmpSet")
+        self.cav_phase_pv = epics.PV(pv_name_start + "CtlPhaseSet")
+        self.cav_blankig_pv = epics.PV(pv_name_start + "BlnkBeam")       
         
     def getAlias(self):
         return self.alias 
         
+    def connectPVs(self):
+        time.sleep(0.05)
+        self.is_connected = True
+        if(self.cav_amp_pv.connected and self.cav_phase_pv.connected \
+            and self.cav_blankig_pv.connected):
+            return self.is_connected
+        self.is_connected = False
+        return self.is_connected
+        
+    def isConnected(self):
+        return self.is_connected
+     
+    def setCavityEPICS_Blanking(self,cav_is_blank):
+        if(self.is_connected):
+            self.cav_blankig_pv.put(bool(cav_is_blank))
+        
+    def getCavityEPICS_Blanking(self):
+        if(self.is_connected):
+            return bool(self.cav_blankig_pv.get())
+        return False
+        
+    def setEPICS_CavityAmp(self,epics_cav_amp):
+        if(self.is_connected):
+            self.cav_amp_pv.put(epics_cav_amp)
+        self.epics_cav_amp = epics_cav_amp
+        
+    def getEPICS_CavityAmp(self):
+        if(self.is_connected):
+            return self.cav_amp_pv.get()
+        return self.epics_cav_amp
+
+    def setEPICS_CavityPhase(self,epics_cav_phase):
+        if(self.is_connected):
+            self.cav_phase_pv.put(epics_cav_phase)
+        
+    def getEPICS_CavityPhase(self):
+        if(self.is_connected):
+            return self.cav_phase_pv.get()
+        return self.epics_cav_phase
+
 class BPM_Wrapper:
     def __init__(self,model_bpm):
         self.model_bpm = model_bpm
+        #---- PyORBIT BPM
+        self.bpm = self.model_bpm.bpm
         st = "SCL:"
         if(model_bpm.bpm.getName().find("HEBT") >= 0): st = "HEBT:"
         if(model_bpm.bpm.getName().find("CCL") >= 0): st = "CCL:"
@@ -48,20 +108,64 @@ class BPM_Wrapper:
         self.isGood = True
         #---- OEDA stands for Off Energy Delay Adjustment in [ms]
         self.oeda_time_shift = 0.
+        #---- PV Channels
+        self.is_connected = False
+        res = self.bpm.getName().split(":")[1]
+        pv_name_start = "SCL_Diag:" + res + ":"
+        if(self.bpm.getName().find("HEBT") >= 0): pv_name_start = "HEBT_Diag:" + res + ":"
+        if(self.bpm.getName().find("CCL") >= 0): pv_name_start = "CCL_Diag:" + res + ":"
+        self.bpm_amp_pv = epics.PV(pv_name_start + "amplitudeAvg")
+        self.bpm_phase_pv = epics.PV(pv_name_start + "phaseAvg")
+        self.bpm_oeda_pv = epics.PV(pv_name_start + "OEDA")
         
     def getPosition(self):
         return self.model_bpm.getPosition()
         
-    def setOEDA_TimeShift(self,oeda_time_shift):
+    def setOEDA_EPICS_TimeShift(self,oeda_time_shift):
         """ OEDA stands for Off Energy Delay Adjustment in [ms] """
         self.oeda_time_shift = oeda_time_shift
+        if(self.is_connected):
+            self.bpm_oeda_pv.put(oeda_time_shift)
         
-    def getOEDA_TimeShift(self):
+    def getOEDA_EPICS_TimeShift(self):
         """ OEDA stands for Off Energy Delay Adjustment in [ms] """
+        if(self.is_connected):
+            return self.bpm_oeda_pv.get()
         return self.oeda_time_shift
+
+    def getAmpPV(self):
+        """ Returns BPM amplitude PV instance """
+        return self.bpm_amp_pv
         
+    def getPhasePV(self):
+        """ Returns BPM phase PV instance """
+        return self.bpm_phase_pv
+        
+    def connectPVs(self):
+        """ It connects all BPM PVs to EPICS """
+        self.is_connected = True
+        if(self.bpm_amp_pv.connected and self.bpm_phase_pv.connected):
+            return self.is_connected
+        self.is_connected = False
+        return self.is_connected
+        
+    def getEPICS_Phase(self):
+        """ Returns BPM EPICS phase value """
+        if(self.is_connected):
+            return self.bpm_phase_pv.get()
+        return 0.
+            
+    def getEPICS_Amp(self):
+        """ Returns BPM EPICS amplitude value """
+        if(self.is_connected):
+            return self.bpm_amp_pv.get()
+        return 0.
+
     def getPhaseOffset(self):
         return self.model_bpm.getEPICS_PhaseOffset()
+        
+    def setPhaseOffset(self,bpm_phase_offset):
+        return self.model_bpm.setEPICS_PhaseOffset(bpm_phase_offset)
         
     def getModelBPM(self):
         return self.model_bpm
@@ -71,3 +175,7 @@ class BPM_Wrapper:
         
     def clean(self):
         pass
+
+
+    
+    

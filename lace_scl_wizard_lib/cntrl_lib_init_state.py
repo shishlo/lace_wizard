@@ -282,7 +282,7 @@ class BPMsParamsTableModel(LACE_DataTableModel):
     def _updateItemsFromData(self):
         for bpm_ind,bpm_wrapper in enumerate(self.bpm_wrappers):
             item = self.item(bpm_ind,2); self._updateBoolItem(bpm_wrapper.isGood,item)
-            item = self.item(bpm_ind,3); item.setText("%+6.3f"%bpm_wrapper.getOEDA_TimeShift())
+            item = self.item(bpm_ind,3); item.setText("%+6.3f"%bpm_wrapper.getOEDA_EPICS_TimeShift())
         
 #----------------------------------------------------------
 # Actions on events with buttons 

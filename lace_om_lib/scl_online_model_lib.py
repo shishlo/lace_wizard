@@ -42,9 +42,6 @@ from orbit.space_charge.sc3d import setUniformEllipsesSCAccNodes
 from .sns_linac_bunch_generator import SNS_Linac_BunchGenerator
 from .sns_linac_bunch_generator import get_SCL_EmptyBunch
 
-#---- Channel access
-import epics
-
 def getBPM_Position_Dict(accLattice):
     """
     Retuns bpm_list and bpm_pos_dict - ( bpm_list,bpm_pos_dict)
@@ -348,46 +345,10 @@ class ModelBPM(BunchDiagnosticNode):
         BunchDiagnosticNode.__init__(self,name,twiss_analysis,bpm_frequency,cav_frequency)
         #---- bpm is a usual linac lattice marker
         self.bpm = bpm
-        #---- PV Channels
-        self.is_connected = False
-        res = self.bpm.getName().split(":")[1]
-        pv_name_start = "SCL_Diag:" + res + ":"
-        if(self.bpm.getName().find("HEBT") >= 0): pv_name_start = "HEBT_Diag:" + res + ":"
-        if(self.bpm.getName().find("CCL") >= 0): pv_name_start = "CCL_Diag:" + res + ":"
-        self.bpm_amp_pv = epics.PV(pv_name_start + "amplitudeAvg")
-        self.bpm_phase_pv = epics.PV(pv_name_start + "phaseAvg")
 
     def getBPM(self):
         """ Returns PyORBIT BPM node - marker """
         return self.bpm
-        
-    def getAmpPV(self):
-        """ Returns BPM amplitude PV instance """
-        return self.bpm_amp_pv
-        
-    def getPhasePV(self):
-        """ Returns BPM phase PV instance """
-        return self.bpm_phase_pv
-        
-    def connectPVs(self):
-        """ It connects all BPM PVs to EPICS """
-        self.is_connected = True
-        if(self.bpm_amp_pv.connected and self.bpm_phase_pv.connected):
-            return self.is_connected
-        self.is_connected = False
-        return self.is_connected
-        
-    def getEPICS_Phase(self):
-        """ Returns BPM EPICS phase value """
-        if(self.is_connected):
-            return self.bpm_phase_pv.get()
-        return 0.
-            
-    def getEPICS_Amp(self):
-        """ Returns BPM EPICS amplitude value """
-        if(self.is_connected):
-            return self.bpm_amp_pv.get()
-        return 0.
         
     def setEPICS_PhaseOffset(bpm_phase_offset):
         """ Sets BPM EPICS phase offset value """
@@ -469,17 +430,6 @@ class ModelCavity:
         self.cav_is_blank = False
         #---- is cavity good - if not it will not be considering working
         self.is_good = True
-        #---- PV Channels
-        self.is_connected = False
-        pv_name_start = ""
-        if(self.cav.getName().find("SCL") >= 0):
-            pv_name_start = "SCL_LLRF:FCM" + self.cav.getName().split(":")[1].replace("Cav","") + ":"
-        if(self.cav.getName().find("CCL") >= 0):
-            tank_number_str = self.cav.getName()[3]
-            pv_name_start = "CCL_LLRF:FCM" + tank_number_str + ":"
-        self.cav_amp_pv = epics.PV(pv_name_start + "CtlAmpSet")
-        self.cav_phase_pv = epics.PV(pv_name_start + "CtlPhaseSet")
-        self.cav_blankig_pv = epics.PV(pv_name_start + "BlnkBeam")
         
     def getName(self):
         return (self.cav.getName() + "-model")
@@ -493,20 +443,7 @@ class ModelCavity:
         if(not self.is_good):
             self.model_cav_amp = 0.
             self.setModelAmp(self.model_cav_amp)
-        return self.is_good     
-
-    def connectPVs(self):
-        time.sleep(0.1)
-        #print ("debug cav=",self.cav.getName()," amp_pv =",self.cav_amp_pv.pvname," cav_phase_pv=",self.cav_phase_pv.pvname," cav_blankig_pv=",self.cav_blankig_pv.pvname) 
-        self.is_connected = True
-        if(self.cav_amp_pv.connected and self.cav_phase_pv.connected \
-            and self.cav_blankig_pv.connected):
-            return self.is_connected
-        self.is_connected = False
-        return self.is_connected
-        
-    def isConnected(self):
-        return self.is_connected
+        return self.is_good
 
     def setCavityModelBlanking(self,cav_is_blank):
         """
@@ -516,18 +453,9 @@ class ModelCavity:
         self.cav_is_blank = cav_is_blank
         if(tmp_blank != cav_is_blank):
             self.setModelAmp(self.model_cav_amp)
-    
-    def setCavityEPICS_Blanking(self,cav_is_blank):
-        if(self.is_connected):
-            self.cav_blankig_pv.put(bool(cav_is_blank))
             
     def getCavityModelBlanking(self):
         return self.cav_is_blank
-        
-    def getCavityEPICS_Blanking(self):
-        if(self.is_connected):
-            return bool(self.cav_blankig_pv.get())
-        return False
         
     def getBunchDiagnosticNodesInOut(self):
         return (self.diag_node_in,self.diag_node_out)
@@ -548,16 +476,6 @@ class ModelCavity:
         """
         return (self.cav_rfgap_start_ind,self.cav_rfgap_end_ind)
         
-    def setEPICS_CavityAmp(self,epics_cav_amp):
-        if(self.is_connected):
-            self.cav_amp_pv.put(epics_cav_amp)
-        self.epics_cav_amp = epics_cav_amp
-        
-    def getEPICS_CavityAmp(self):
-        if(self.is_connected):
-            return self.cav_amp_pv.get()
-        return self.epics_cav_amp 
-        
     def updateModelCoeffToEpicsAmp(self):
         if(self.model_cav_amp > 0.):
             self.modelCoeffToEpicsAmp = self.epics_cav_amp/self.model_cav_amp
@@ -572,15 +490,6 @@ class ModelCavity:
         self.setModelPhase(self.epics_cav_phase + self.cav_phase_offset)
         
     def getEPICS_CavityModelPhase(self):
-        return self.epics_cav_phase
-            
-    def setEPICS_CavityPhase(self,epics_cav_phase):
-        if(self.is_connected):
-            self.cav_phase_pv.put(epics_cav_phase)
-        
-    def getEPICS_CavityPhase(self):
-        if(self.is_connected):
-            return self.cav_phase_pv.get()
         return self.epics_cav_phase
 
     def setCavityPhaseOffset(self,cav_phase_offset):
