@@ -63,11 +63,9 @@ class Cavs_Scan_Cntrl:
         
         #---- The QWidget with Cavities and BPMs tables
         self.cavs_table_view = LACE_QTableView()
-        """
         self.cavs_data_table_model = CavsScanDataTableModel(self)
         self.cavs_table_view.setModel(self.cavs_data_table_model)
         self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        """
 
     def getTabName(self):
         """ Returns the tab name the controller """
@@ -143,30 +141,27 @@ class CavsScanDataTableModel(LACE_DataTableModel):
         self.cavs_scan_cntrl = cavs_scan_cntrl
         self.cavs_phase_scan_cntrl = self.cavs_scan_cntrl.cavs_phase_scan_cntrl
         self.lace_scl_wizard = self.cavs_phase_scan_cntrl.lace_scl_wizard
-        self.cavs_state_cntrl = self.cavs_phase_scan_cntrl.cavs_state_cntrl
-        self.cav_wrappers = self.cavs_state_cntrl.getCavWrappers()
+        #self.cavs_state_cntrl = self.cavs_phase_scan_cntrl.cavs_state_cntrl
+        self.cav_wrappers = self.lace_scl_wizard.getCavWrappers()
         #---- Sets the headers
-        headers = ["Cavity", "Pos[m]","Good","EPICS_Amp","Epics_Phase","Measured","Analyzed","ModelAmp","ModelPhase","CoeffAmp","PhaseOffset"]     
+        headers = ["Cavity","Good","Done","BPM 1","BPM 2","Old Phase","New Phase","SinAmp","ErrAmp","AccPhase"]     
         self.setHorizontalHeaderLabels(headers)
         for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):
             name_item = QStandardItem(cav_wrapper.getAlias())
-            pos_item = QStandardItem("%7.3f"%cav_wrapper.model_cav.getPosition())
             isGood_item = QStandardItem() ; isGood_item.setCheckable(True) ; isGood_item.setCheckState(Qt.Checked)
-            epics_amp_item = QStandardItem()
-            epics_phase_item = QStandardItem()
-            measured_item = QStandardItem() ; measured_item.setCheckable(True) ; measured_item.setCheckState(Qt.Unchecked)
-            analyzed_item = QStandardItem() ; analyzed_item.setCheckable(True) ; analyzed_item.setCheckState(Qt.Unchecked)
-            measured_item.setEnabled(False)
-            analyzed_item.setEnabled(False)
-            model_amp_item = QStandardItem()
-            model_phase_item = QStandardItem()
-            model_coeff_amp_item = QStandardItem()
-            phase_offset_item = QStandardItem()
-            row  = [name_item,pos_item,isGood_item,]
-            row += [epics_amp_item,epics_phase_item]
-            row += [measured_item,analyzed_item]
-            row += [model_amp_item,model_phase_item]
-            row += [model_coeff_amp_item,phase_offset_item]
+            isDone_item = QStandardItem() ; isDone_item.setCheckable(True) ;  isDone_item.setCheckState(Qt.Unchecked)
+            bpm1_item = QStandardItem();
+            bpm2_item = QStandardItem();
+            epics_phase_old_item = QStandardItem();
+            epics_phase_new_item = QStandardItem();
+            scan_phase_sinAmp_item = QStandardItem();
+            scan_phase_errAmp_item = QStandardItem();
+            synch_phase_item = QStandardItem();
+            row  = [name_item,isGood_item,isDone_item]
+            row += [bpm1_item,bpm2_item]
+            row += [epics_phase_old_item,epics_phase_new_item]
+            row += [scan_phase_sinAmp_item,scan_phase_errAmp_item]
+            row += [synch_phase_item,]
             self.appendRow(row)
         self.itemChanged.connect(self.handleItemChanged)
             
@@ -174,19 +169,19 @@ class CavsScanDataTableModel(LACE_DataTableModel):
     def handleItemChanged(self, item):
         """ Only the Good descriptor is allowed to be changed from the Table View """
         if(item.isCheckable() and item.checkState() in (Qt.Checked, Qt.Unchecked)):
-            current_state = item.checkState()
-            row = item.row()
             col = item.column()
-            if(col != 2): return
-            if current_state == Qt.Checked:
-                self.cav_wrappers[row].isGood = True
-            elif current_state == Qt.Unchecked:
-                self.cav_wrappers[row].isGood = False       
+            if(col != 1 or col != 2): return
+            if(col == 1): 
+                self.bpm_wrappers[item.row()].isGood = self._getValueOfBoolItem(item)
+                return
+            if(col == 2): 
+                self.bpm_wrappers[item.row()].isMeasured = self._getValueOfBoolItem(item)
+                return
 
     def _updateItemsFromData(self):
         for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):             
             #---- cavity is good
-            self._updateBoolItem(cav_wrapper.isGood,self.item(cav_ind,2))
+            self._updateBoolItem(cav_wrapper.isGood,self.item(cav_ind,1))
             if(not cav_wrapper.isGood):
                 cav_wrapper.modelAmp = 0.
                 cav_wrapper.model_cav.setModelAmp(cav_wrapper.modelAmp)

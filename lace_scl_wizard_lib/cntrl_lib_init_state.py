@@ -180,14 +180,9 @@ class CavsDataTableModel(LACE_DataTableModel):
     def handleItemChanged(self, item):
         """ Only the Good descriptor is allowed to be changed from the Table View """
         if(item.isCheckable() and item.checkState() in (Qt.Checked, Qt.Unchecked)):
-            current_state = item.checkState()
-            row = item.row()
             col = item.column()
             if(col != 2): return
-            if current_state == Qt.Checked:
-                self.cav_wrappers[row].isGood = True
-            elif current_state == Qt.Unchecked:
-                self.cav_wrappers[row].isGood = False       
+            self.cav_wrappers[item.row()].isGood = self._getValueOfBoolItem(item)     
 
     def _updateItemsFromData(self):
         for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):             
@@ -196,8 +191,8 @@ class CavsDataTableModel(LACE_DataTableModel):
             if(not cav_wrapper.isGood):
                 cav_wrapper.modelAmp = 0.
                 cav_wrapper.model_cav.setModelAmp(cav_wrapper.modelAmp)
-            epics_amp_item = self.item(cav_ind,3) ; epics_amp_item.setText("%7.4f"%cav_wrapper.epicsAmp)
-            epics_phase_item = self.item(cav_ind,4) ; epics_phase_item.setText("%+6.1f"%cav_wrapper.epicsPhase)
+            epics_amp_item = self.item(cav_ind,3) ; epics_amp_item.setText("%7.4f"%cav_wrapper.epicsAmpInit)
+            epics_phase_item = self.item(cav_ind,4) ; epics_phase_item.setText("%+6.1f"%cav_wrapper.epicsPhaseInit)
             self._updateBoolItem(cav_wrapper.isMeasured,self.item(cav_ind,5))
             self._updateBoolItem(cav_wrapper.isAnalyzed,self.item(cav_ind,6))
             model_amp_item  = self.item(cav_ind,7) ; model_amp_item.setText("%6.4f"%cav_wrapper.modelAmp)           
@@ -241,7 +236,7 @@ class BPMsDataTableModel(LACE_DataTableModel):
     def _updateItemsFromData(self):
         for bpm_ind,bpm_wrapper in enumerate(self.bpm_wrappers):
             item = self.item(bpm_ind,2); self._updateBoolItem(bpm_wrapper.isGood,item)
-            #item = self.item(bpm_ind,3); item.setText("%+7.1f"%bpm_wrapper.getPhaseOffset())
+            item = self.item(bpm_ind,3); item.setText("%+7.1f"%bpm_wrapper.getPhaseOffset())
 
 class BPMsParamsTableModel(LACE_DataTableModel):
     def __init__(self,init_state_cntrl):
@@ -299,8 +294,14 @@ class InitSelectedCavs_Action:
     """ Initialization all cavities """ 
     def __init__(self,init_state_cntrl):
         self.init_state_cntrl = init_state_cntrl
+        self.cavs_table_view = self.init_state_cntrl.cavs_table_view
         
     def performAction(self):
+        selection_model = self.cavs_table_view.selectionModel()
+        QModelIndex_list = selection_model.selectedRows()
+        for q_model_ind in QModelIndex_list:
+            row = q_model_ind.row()
+            print ("debug row=",row)
         print ("debug init selected")
         
 class CleanAllCavs_Action:
@@ -315,8 +316,14 @@ class CleanSelectedCavs_Action:
     """ Clean all scan data for selcted cavities """ 
     def __init__(self,init_state_cntrl):
         self.init_state_cntrl = init_state_cntrl
+        self.cavs_table_view = self.init_state_cntrl.cavs_table_view
         
     def performAction(self):
+        selection_model = self.cavs_table_view.selectionModel()
+        QModelIndex_list = selection_model.selectedRows()
+        for q_model_ind in QModelIndex_list:
+            row = q_model_ind.row()
+            print ("debug row=",row)        
         print ("debug clean selected")
         
 class BPMReadPhaseOffset_Action:

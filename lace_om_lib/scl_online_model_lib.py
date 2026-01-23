@@ -338,23 +338,25 @@ class ModelBPM(BunchDiagnosticNode):
     """
     BPM node as Bunch diagnostic node and connector to BPM's EPICS signals. 
     """
-    def __init__(self,twiss_analysis,bpm,bpm_frequency = 402.5e+6,cav_frequency = 805.0e+6):
+    def __init__(self,twiss_analysis,bpm,bpm_frequency = 402.5e+6,cav_frequency = 805.0e+6):     
+        BunchDiagnosticNode.__init__(self,"none",twiss_analysis,bpm_frequency,cav_frequency)
         name = bpm.getName()
         if(name.find("BPM") <= 0): name += ":BPM"
-        name += "-model"
-        BunchDiagnosticNode.__init__(self,name,twiss_analysis,bpm_frequency,cav_frequency)
+        name += "-model"   
+        self.setName(name)
         #---- bpm is a usual linac lattice marker
         self.bpm = bpm
+        self.bpm_phase_offset = 0.
 
     def getBPM(self):
         """ Returns PyORBIT BPM node - marker """
         return self.bpm
         
-    def setEPICS_PhaseOffset(bpm_phase_offset):
+    def setEPICS_PhaseOffset(self,bpm_phase_offset):
         """ Sets BPM EPICS phase offset value """
         self.bpm_phase_offset = bpm_phase_offset
         
-    def getEPICS_PhaseOffset():
+    def getEPICS_PhaseOffset(self):
         """ Returns BPM EPICS phase offset value """
         return self.bpm_phase_offset
         
