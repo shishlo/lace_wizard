@@ -2,6 +2,7 @@
 Controller for initialization of the SCL (CCL+HEBT also) linac from EPICS 
 """
 import sys
+import html
 
 from PySide6.QtWidgets import (
     QFrame,
@@ -152,7 +153,8 @@ class CavsDataTableModel(LACE_DataTableModel):
         self.cavs_state_cntrl = self.init_state_cntrl.cavs_state_cntrl
         self.cav_wrappers = self.cavs_state_cntrl.getCavWrappers()
         #---- Sets the headers
-        headers = ["Cavity", "Pos[m]","Good","EPICS_Amp","Epics_Phase","Measured","Analyzed","ModelAmp","ModelPhase","CoeffAmp","PhaseOffset"]     
+        headers = ["Cavity", "Pos[m]","Good","EPICS_Amp","Epics_Phase","Measured","Analyzed","ModelAmp","ModelPhase","CoeffAmp","PhaseOffset"]
+        headers = ["Cavity", "Pos[m]","Good","EPICS_Amp","Epics_Phase","Measured","Analyzed","ModelAmp",html.unescape("&phi;-model"),"CoeffAmp","PhaseOffset"]
         self.setHorizontalHeaderLabels(headers)
         for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):
             name_item = QStandardItem(cav_wrapper.getAlias())
@@ -182,7 +184,7 @@ class CavsDataTableModel(LACE_DataTableModel):
         if(item.isCheckable() and item.checkState() in (Qt.Checked, Qt.Unchecked)):
             col = item.column()
             if(col != 2): return
-            self.cav_wrappers[item.row()].isGood = self._getValueOfBoolItem(item)     
+            self.cav_wrappers[item.row()].isGood = self._getValueOfBoolItem(item)
 
     def _updateItemsFromData(self):
         for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):             

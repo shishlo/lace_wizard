@@ -540,7 +540,7 @@ class ModelCavity:
         
     def trackEmptyBunch(self,eKinIn, cavEPICS_PhaseArr):
         """
-        It returns (position_of_last_rf_gap,eKinOut_arr,timeOut_arr) 
+        It returns (eKinOut_arr,timeOut_arr) 
         for each cavity phase in cavEPICS_PhaseArr.
         eKin in MeV, phases in degrees
         """

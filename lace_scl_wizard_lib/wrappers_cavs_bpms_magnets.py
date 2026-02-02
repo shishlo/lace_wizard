@@ -17,17 +17,22 @@ class Cavity_Wrapper:
         self.isGood = True
         self.isMeasured = False
         self.isAnalyzed = False
-        #---- bpm_amp_phase_dict and bpm_xy_dict dictionary with BasicGraph data
+        #---- bpm_amp_phase_dict and bpm_xy_dict dictionary with Function instances data
         #---- self.bpm_amp_phase_dic[BPM_Wrapper] = (FunctionAmp,FunctionPhase)
         self.bpm_amp_phase_dict = {}
+        #---- bpm_amp_phase_in_stat_dict - statistics of BPMs phases and amplitudes 
+        #---- at the entrance of the cavity to calculate the entrance energy
+        #---- self.bpm_amp_phase_in_stat_dict = (FunctionAmp,FunctionPhase)
+        self.bpm_amp_phase_in_stat_dict = {}
+        #---------------------------------------------------------------------
         self.bpm_wrappers = bpm_wrappers
         #--- use or not in phase scan analysis: self.bpm_wrappers_useInPhaseAnalysis[bpm_wrapper,]
         self.bpm_wrappers_useInPhaseAnalysis = []
         #--- use or not in BPMs' amplitudes analysis: self.bpm_wrappers_useInAmpBPMs[bpm_wrapper,]
         self.bpm_wrappers_useInAmpBPMs = []
         #--- BPM wrappers for BPM0 and BPM1 during cavity phase setup after the phase scan
-        self.bpm_wrapper0 = "None"
-        self.bpm_wrapper1 = "None"
+        self.bpm_wrapper0 = None
+        self.bpm_wrapper1 = None
         #----cavity's parameters 
         self.epicsAmp = 0.
         self.epicsPhase = 0.
@@ -39,6 +44,11 @@ class Cavity_Wrapper:
         self.modelAmp = 0.
         self.modelPhase = 0.       
         self.modelCoeffToEpicsAmp = 0.
+        #---- Results of the sin-like analysis: bpm phases vs. cav. phase, amp in degrees 
+        self.sin_phase_func_amp = 0.
+        self.sin_phase_func_amp_err = 0.
+        #---- accelerating phase of the cavity: self.epicsPhase shift from cav. phase for min phase of BPMs
+        self.synch_acc_phase = 0.
         #---- This is a phase shift between EPICS and model phases
         self.model_phase_shift = 0.
         #---- kinetic energies in MeV
