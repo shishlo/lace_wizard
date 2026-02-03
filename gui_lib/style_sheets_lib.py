@@ -15,7 +15,7 @@ class StyleSheetFactory:
                 border-radius: 10px;
                 border-color: beige;
                 font: bold 14px;
-                min-width: 10em;
+                min-width: 4em;
                 padding: 6px;
             }
             QPushButton:hover {

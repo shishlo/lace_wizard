@@ -42,7 +42,7 @@ class LACE_SCL_Wizard:
         self.mainQApp = QApplication(argv)
         self.mainWindow = LACE_SCL_Wizard_MainWindow(self)
         self.mainWindow.setWindowTitle("LACE SCL Wizard")
-        self.mainWindow.resize(1100, 600)
+        self.mainWindow.resize(1400, 600)
         self.statusBar = self.mainWindow.getStatusBar()
         
         self.tabs = QTabWidget()
@@ -97,6 +97,9 @@ class LACE_SCL_Wizard:
             if(self.tabs.tabText(ind) == name):
                 return self.tabs.widget(ind)
         return widget
+        
+    def getStatusBar(self):
+        return self.mainWindow.getStatusBar()     
         
     def stopAllThreads(self):
         for controller in self.controllers_arr:

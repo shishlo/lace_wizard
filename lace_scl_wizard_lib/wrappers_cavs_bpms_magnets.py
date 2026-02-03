@@ -18,18 +18,22 @@ class Cavity_Wrapper:
         self.isMeasured = False
         self.isAnalyzed = False
         #---- bpm_amp_phase_dict and bpm_xy_dict dictionary with Function instances data
-        #---- self.bpm_amp_phase_dic[BPM_Wrapper] = (FunctionAmp,FunctionPhase)
+        #---- self.bpm_amp_phase_dic[BPM_Wrapper.getName()] = (FunctionAmp,FunctionPhase)
         self.bpm_amp_phase_dict = {}
         #---- bpm_amp_phase_in_stat_dict - statistics of BPMs phases and amplitudes 
         #---- at the entrance of the cavity to calculate the entrance energy
-        #---- self.bpm_amp_phase_in_stat_dict = (FunctionAmp,FunctionPhase)
+        #---- self.bpm_amp_phase_in_stat_dict[BPM_Wrapper.getName()] = (FunctionAmp,FunctionPhase)
         self.bpm_amp_phase_in_stat_dict = {}
         #---------------------------------------------------------------------
         self.bpm_wrappers = bpm_wrappers
         #--- use or not in phase scan analysis: self.bpm_wrappers_useInPhaseAnalysis[bpm_wrapper,]
         self.bpm_wrappers_useInPhaseAnalysis = []
+        for bpm_wrapper in self.bpm_wrappers:
+            self.bpm_wrappers_useInPhaseAnalysis.append(True)
         #--- use or not in BPMs' amplitudes analysis: self.bpm_wrappers_useInAmpBPMs[bpm_wrapper,]
         self.bpm_wrappers_useInAmpBPMs = []
+        for bpm_wrapper in self.bpm_wrappers:
+            self.bpm_wrappers_useInAmpBPMs.append(True)
         #--- BPM wrappers for BPM0 and BPM1 during cavity phase setup after the phase scan
         self.bpm_wrapper0 = None
         self.bpm_wrapper1 = None

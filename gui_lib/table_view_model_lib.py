@@ -15,6 +15,7 @@ class LACE_QTableView(QTableView):
     """
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.verticalHeader().setDefaultSectionSize(20) 
         
     def showEvent(self, event):
         """Runs automatically when the window is shown."""
