@@ -1,5 +1,5 @@
 """
-Controller for SCL cavities phase scans and analysis. After analysis we 
+Controller for SCL cavities phase scans and analysis. After analysis we
 will have the calibrated Online Model for SCL.
 """
 import sys
@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QWidget,
     QTabWidget,
+    QGroupBox,
     QProgressBar,
     QMainWindow,
     QHeaderView,
@@ -37,6 +38,19 @@ from PySide6.QtGui import (
     QIcon,
     QPalette, QColor
     )
+
+import pyqtgraph as pg
+
+"""
+from pyqtgraph import (
+    mkPen, PlotWidget, 
+    InfiniteLine, InfLineLabel, 
+    TextItem, AxisItem, 
+    ViewBox, 
+    PlotDataItem, 
+    ErrorBarItem
+    )
+"""
 
 from gui_lib.borderlayout import BorderLayout, Position
 from gui_lib.style_sheets_lib import StyleSheetFactory
@@ -65,51 +79,78 @@ class Cavs_Scan_Cntrl:
         self.mainWidget = QFrame(self.cavs_phase_scan_cntrl.tabs)
         #---- tab name
         self.tab_name = "SCL Phase Scan"
-        #---- 
+        #----
         
+        groupBox_style = StyleSheetFactory.groupBoxStyleSheet()
+
         #---- The QWidget with Cavities and BPMs tables
         self.cavs_table_view = LACE_QTableView()
         self.cavs_data_table_model = CavsScanDataTableModel(self)
         self.cavs_table_view.setModel(self.cavs_data_table_model)
         #self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        
+
+        #---- BPMs that will be used for analysis
         self.bpms_table_view = LACE_QTableView()
         self.bpms_use_table_model = BPMsForAnalysisTableModel(self)
         self.bpms_table_view.setModel(self.bpms_use_table_model)
-        self.bpms_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
-        ####  does not work self.bpms_table_view.setWindowTitle("Cavity Name")        
-        
-        #---- upper panel 
-        self.upper_panel_cntrl = UpperScanPanelCntrl(self.cavs_phase_scan_cntrl)
-        
-        #---- Border Layout for self.cavs_scan_cntrl
-        border_layout = BorderLayout(None)
+        self.bpms_table_view.horizontalHeader().setSectionResizeMode(0,QHeaderView.ResizeToContents)
+        self.bpms_table_view.horizontalHeader().setSectionResizeMode(1,QHeaderView.ResizeMode.Stretch)
+        self.bpms_table_view.horizontalHeader().setSectionResizeMode(2,QHeaderView.ResizeMode.Stretch)
 
-        border_layout.addWidget(self.cavs_table_view , Position.Center)
-        border_layout.addWidget(self.bpms_table_view, Position.East)
-        border_layout.addWidget(self.upper_panel_cntrl.getMainWidget(), Position.North)
-        self.getMainWidget().setLayout(border_layout)        
+        #---- Tab for BPM table name
+        self.bpms_tab_panel = QTabWidget()
+        self.bpms_tab_panel.setTabPosition(QTabWidget.TabPosition.North)
+        self.bpms_tab_panel.setMovable(False)
+        self.bpms_tab_panel.addTab(self.bpms_table_view,"Cavity None")
+
+        #---- upper panel
+        self.upper_panel_cntrl = UpperScanPanelCntrl(self.cavs_phase_scan_cntrl)
+
+        #---- bottom panel with plots and bpm data cleaning buttons
+        self.bottom_panel_cntrl = BottomScanPanelCntrl(self.cavs_phase_scan_cntrl)
+        
+        central_layout = QHBoxLayout()
+        central_layout.setSpacing(0)
+        central_layout.setContentsMargins(0, 0, 0, 0)   
+        central_layout.addWidget(self.cavs_table_view,1)
+        central_layout.addWidget(self.bpms_tab_panel)
+        
+        central_view = QGroupBox()
+        central_view.setLayout(central_layout)
+        
+        #---- Define the style sheet for the border
+        central_view.setStyleSheet(groupBox_style)
+
+        main_layout = QVBoxLayout()
+        main_layout.setSpacing(0)
+        main_layout.setContentsMargins(0, 0, 0, 0)          
+        main_layout.addWidget(self.upper_panel_cntrl.getMainWidget())
+        main_layout.addWidget(central_view,1)
+        main_layout.addWidget(self.bottom_panel_cntrl.getMainWidget(),1)
+        
+        self.getMainWidget().setLayout(main_layout)
+        
 
     def getTabName(self):
         """ Returns the tab name the controller """
         return self.tab_name
-        
+
     def getMainWidget(self):
         """ Returns the mainWidget (window) """
         return self.mainWidget
-        
+
     def getCavWrappers(self):
         return self.cav_wrappers
 
     def dumpCntrlDataToDA(self,parent_da):
         """ Puts this controller data into the Data Adaptor """
         return
-       
+
     def readCntrlDataFromDA(self,parent_da):
         """ Reads data for this controller from the Data Adaptor """
         return
-        
+
     def stopAllThreads(self):
         """ Stops all threads of this controller """
         #self.scanStopper.setSetToStop(True)
@@ -134,22 +175,22 @@ class Scan_Analysis_Cntrl:
     def getTabName(self):
         """ Returns the tab name the controller """
         return self.tab_name
-        
+
     def getMainWidget(self):
         """ Returns the mainWidget (window) """
         return self.mainWidget
-        
+
     def getCavWrappers(self):
         return self.cav_wrappers
 
     def dumpCntrlDataToDA(self,parent_da):
         """ Puts this controller data into the Data Adaptor """
         return
-       
+
     def readCntrlDataFromDA(self,parent_da):
         """ Reads data for this controller from the Data Adaptor """
         return
-        
+
     def stopAllThreads(self):
         """ Stops all threads of this controller """
         #self.scanStopper.setSetToStop(True)
@@ -171,69 +212,73 @@ class UpperScanPanelCntrl:
         self.cav_wrappers = self.lace_scl_wizard.getCavWrappers()
         self.bpm_wrappers = self.lace_scl_wizard.getBPM_Wrappers()
         #---- main widget
-        self.mainWidget = QFrame(self.cavs_phase_scan_cntrl.tabs)
-        
+        #self.mainWidget = QFrame(self.cavs_phase_scan_cntrl.tabs)
+        self.mainWidget = QGroupBox()
+
         buttons_style = StyleSheetFactory.pushButtonStyleSheet()
-        
-        #---- vertical layout 
+        groupBox_style = StyleSheetFactory.groupBoxStyleSheet()
+
+        #---- vertical layout
         vlayout = QVBoxLayout()
         # Set spacing between widgets to 0
         vlayout.setSpacing(0)
         # Remove margins around the layout (top, bottom, left, right)
-        vlayout.setContentsMargins(0, 0, 0, 0) 
-        
+        vlayout.setContentsMargins(0, 0, 0, 0)
+
         hor_view_1 = QWidget()
         hor_view_2 = QWidget()
         hor_layout_1 = QHBoxLayout()
         hor_layout_2 = QHBoxLayout()
-        hor_layout_1.setContentsMargins(0, 0, 0, 0) 
+        hor_layout_1.setSpacing(0)
+        hor_layout_2.setSpacing(0)
+        hor_layout_1.setContentsMargins(0, 0, 0, 0)
         hor_layout_2.setContentsMargins(0, 0, 0, 0)
         hor_layout_1.setAlignment(Qt.AlignLeft)
         hor_layout_2.setAlignment(Qt.AlignLeft)
         hor_view_1.setLayout(hor_layout_1)
         hor_view_2.setLayout(hor_layout_2)
-        
+
         vlayout.addWidget(hor_view_1)
         vlayout.addWidget(hor_view_2)
-        
+
         #----------------------------------------------
         #---- upp line - hor_view_1 panel
         #----------------------------------------------
         setSynchPhase_button = QPushButton(text=html.unescape("Set Sync. &phi; to Selected Cavs [deg]="),parent=None)
         setSynchPhase_button.setStyleSheet(buttons_style)
-        
+
         self.sync_phase_double_spin_box = QDoubleSpinBox()
         self.sync_phase_double_spin_box.setRange(-180.0, 180.0) # Set min/max range
         self.sync_phase_double_spin_box.setDecimals(1)          # Set precision to 2 decimal places
         self.sync_phase_double_spin_box.setSingleStep(0.1)      # Set step size for arrow buttons
         self.sync_phase_double_spin_box.setValue(15.0)          # Set default value
-        
-        scan_wait_time_label = QLabel("   Scan Wait t[sec]=")     
+
+        scan_wait_time_label = QLabel("   Scan Wait t[sec]=")
         self.scan_wait_time_spin_box = QDoubleSpinBox()
         self.scan_wait_time_spin_box.setRange(0.,10.)    # Set min/max range
         self.scan_wait_time_spin_box.setDecimals(2)      # Set precision to 2 decimal places
         self.scan_wait_time_spin_box.setSingleStep(0.05) # Set step size for arrow buttons
         self.scan_wait_time_spin_box.setValue(0.5)       # Set default value
-        
+
         max_sin_amp_err_label = QLabel("    Max Sin Amp. Err[deg]=")
         self.max_sin_amp_err_spin_box = QDoubleSpinBox()
         self.max_sin_amp_err_spin_box.setRange(0.,180.)   # Set min/max range
         self.max_sin_amp_err_spin_box.setDecimals(1)      # Set precision to 2 decimal places
         self.max_sin_amp_err_spin_box.setSingleStep(0.5)  # Set step size for arrow buttons
         self.max_sin_amp_err_spin_box.setValue(4.0)       # Set default value
-        
+
         stat_for_in_enrg_label = QLabel(html.unescape("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Statistics for input E <sub>kin</sub>="))
         self.stat_for_in_enrg_spin_box = QDoubleSpinBox()
         self.stat_for_in_enrg_spin_box.setRange(1.,30.)    # Set min/max range
         self.stat_for_in_enrg_spin_box.setDecimals(0)      # Set precision to 2 decimal places
         self.stat_for_in_enrg_spin_box.setSingleStep(1)    # Set step size for arrow buttons
-        self.stat_for_in_enrg_spin_box.setValue(3.0)       # Set default value  
-        
+        self.stat_for_in_enrg_spin_box.setValue(3.0)       # Set default value
+
         self.wrap_phase_button = QRadioButton("Wrap Phases")
         self.wrap_phase_button.setChecked(True)
         self.keep_phases_button = QRadioButton("Keep Cavs Phases")
         self.keep_phases_button.setChecked(False)
-        
+
         hor_layout_1.addWidget(setSynchPhase_button)
         hor_layout_1.addWidget(self.sync_phase_double_spin_box)
         hor_layout_1.addWidget(scan_wait_time_label)
@@ -245,7 +290,7 @@ class UpperScanPanelCntrl:
         hor_layout_1.addWidget(QLabel("   "))
         hor_layout_1.addWidget(self.wrap_phase_button)
         hor_layout_1.addWidget(self.keep_phases_button)
-        
+
         #----------------------------------------------
         #---- lower line - hor_view_2 panel
         #----------------------------------------------
@@ -254,38 +299,139 @@ class UpperScanPanelCntrl:
         self.phase_scan_step_spin_box.setRange(0.,30.)    # Set min/max range
         self.phase_scan_step_spin_box.setDecimals(0)      # Set precision to 2 decimal places
         self.phase_scan_step_spin_box.setSingleStep(1)    # Set step size for arrow buttons
-        self.phase_scan_step_spin_box.setValue(20.0)       # Set default value          
-        
+        self.phase_scan_step_spin_box.setValue(20.0)      # Set default value
+
         start_scan_button = QPushButton(text="Start Scan",parent=None)
         start_scan_button.setStyleSheet(buttons_style)
         start_scan_button.adjustSize()
-        
+
         start_scan_selected_button = QPushButton(text="Start Selected Cavs",parent=None)
         start_scan_selected_button.setStyleSheet(buttons_style)
-        
+
         stop_scan_button = QPushButton(text="Stop Scan",parent=None)
         stop_scan_button.setStyleSheet(buttons_style)
-        
+
         self.scan_status_text = QLineEdit("Scan status:")
-        #palette = self.scan_status_text.palette()
-        #palette.setColor(QPalette.Base, QColor("white"))
-        #palette.setColor(QPalette.Text, QColor("blue"))
-        #self.scan_status_text.setPalette(palette)
         self.scan_status_text.setStyleSheet("color: blue; background-color: white;")
-             
+
         hor_layout_2.addWidget(phase_scan_step_label)
         hor_layout_2.addWidget(self.phase_scan_step_spin_box)
         hor_layout_2.addWidget(start_scan_button)
         hor_layout_2.addWidget(start_scan_selected_button)
         hor_layout_2.addWidget(stop_scan_button)
         hor_layout_2.addWidget(self.scan_status_text,1)
+
+        #---- set layout for main widget
+        self.mainWidget.setLayout(vlayout)
         
+        #---- Define the style sheet for the border
+        self.mainWidget.setStyleSheet(groupBox_style)
+        
+    def getMainWidget(self):
+        """ Returns the mainWidget (window) """
+        return self.mainWidget
+
+class BottomScanPanelCntrl:
+    """
+    The bottom panel in the SCL Phase Scan tab with BPMs phases and amplitudes
+    vs. cavity's phases and BPMs data cleaning control buttons.
+    """
+    def __init__(self,cavs_phase_scan_cntrl):
+        self.cavs_phase_scan_cntrl = cavs_phase_scan_cntrl
+        self.lace_scl_wizard = self.cavs_phase_scan_cntrl.lace_scl_wizard
+        self.model_cavs = self.lace_scl_wizard.getOM().getModelCavs()
+        self.cav_wrappers = self.lace_scl_wizard.getCavWrappers()
+        self.bpm_wrappers = self.lace_scl_wizard.getBPM_Wrappers()
+        #---- main widget
+        self.mainWidget = QFrame(self.cavs_phase_scan_cntrl.tabs)
+       
+        buttons_style = StyleSheetFactory.pushButtonStyleSheet()
+        groupBox_style = StyleSheetFactory.groupBoxStyleSheet()
+
+        #---- vertical layout
+        vlayout = QVBoxLayout()
+        # Set spacing between widgets to 0
+        vlayout.setSpacing(0)
+        # Remove margins around the layout (top, bottom, left, right)
+        vlayout.setContentsMargins(0, 0, 0, 0)
+        
+        #---- Plots panels
+        self.bpm_phase_plot = pg.PlotWidget()
+        self.bpm_amp_plot = pg.PlotWidget()
+        self.bpm_phase_diff_plot = pg.PlotWidget()
+        
+        right_plots_layout = QGridLayout()
+        right_plots_layout.setSpacing(0)
+        right_plots_layout.setContentsMargins(0, 0, 0, 0)
+        
+        right_plots_layout.addWidget(self.bpmPhasePlot(),0,0)
+        right_plots_layout.addWidget(self.bpmAmpPlot(),1,0)
+        
+        right_plots_view = QWidget()
+        right_plots_view.setLayout(right_plots_layout)
+        
+        all_plots_layout = QGridLayout()
+        right_plots_layout.setSpacing(0)
+        right_plots_layout.setContentsMargins(0, 0, 0, 0)        
+        
+        all_plots_layout.addWidget(self.bpmPhaseDiffPlot(),0,0)
+        all_plots_layout.addWidget(right_plots_view,0,1)
+        
+        plots_view = QGroupBox("BPMs data plots")
+        plots_view.setLayout(all_plots_layout)
+        
+        #---- Define the style sheet for the border
+        plots_view.setStyleSheet(groupBox_style)
+        
+        vlayout.addWidget(plots_view, 1)
+          
+        #---- BPM amplitude limit clean up
+        bpm_limit_hlayout = QHBoxLayout()
+        bpm_limit_hlayout.setSpacing(0)
+        bpm_limit_hlayout.setContentsMargins(0, 0, 0, 0)        
+        bpm_limit_hlayout.setAlignment(Qt.AlignLeft)
+        
+        bpm_limit_view = QGroupBox("Post-scan Actions")
+        
+        #---- Define the style sheet for the border
+        bpm_limit_view.setStyleSheet(groupBox_style)
+        
+        bpm_amp_limits_label = QLabel("Minimal BPM Amp.=")
+        
+        self.bpm_min_amp_spin_box = QDoubleSpinBox()
+        self.bpm_min_amp_spin_box.setRange(0.,100.)  # Set min/max range
+        self.bpm_min_amp_spin_box.setDecimals(1)     # Set precision to 2 decimal places
+        self.bpm_min_amp_spin_box.setSingleStep(0.5) # Set step size for arrow buttons
+        self.bpm_min_amp_spin_box.setValue(1.0)      # Set default value
+        
+        bpm_min_amp_button = QPushButton(text="Apply BPM Amp. Limit",parent=None)
+        bpm_min_amp_button.setStyleSheet(buttons_style)
+        bpm_min_amp_button.adjustSize()
+        
+        bpm_limit_hlayout.addWidget(bpm_amp_limits_label)
+        bpm_limit_hlayout.addWidget(self.bpm_min_amp_spin_box)
+        bpm_limit_hlayout.addWidget(bpm_min_amp_button)
+        
+        bpm_limit_view.setLayout(bpm_limit_hlayout)
+        
+        #---- final bottom panel content
+        vlayout.addWidget(bpm_limit_view)
+
         #---- set layout for main widget
         self.mainWidget.setLayout(vlayout)
 
     def getMainWidget(self):
         """ Returns the mainWidget (window) """
-        return self.mainWidget       
+        return self.mainWidget
+        
+    def bpmPhasePlot(self):
+        return self.bpm_phase_plot
+        
+    def bpmAmpPlot(self):
+        return self.bpm_amp_plot
+        
+    def bpmPhaseDiffPlot(self):
+        return self.bpm_phase_diff_plot
 
 #----------------------------------------------------------
 #  Data Table Model
@@ -300,7 +446,7 @@ class CavsScanDataTableModel(LACE_DataTableModel):
         #self.cavs_state_cntrl = self.cavs_phase_scan_cntrl.cavs_state_cntrl
         self.cav_wrappers = self.lace_scl_wizard.getCavWrappers()
         #---- Sets the headers
-        headers = ["Cavity","Good","Done","BPM 1","BPM 2","Old Phase","New Phase","SinAmp","SinAmpErr","AccPhase"]     
+        headers = ["Cavity","Good","Done","BPM 1","BPM 2","Old Phase","New Phase","SinAmp","SinAmpErr","AccPhase"]
         self.setHorizontalHeaderLabels(headers)
         for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):
             name_item = QStandardItem(cav_wrapper.getAlias())
@@ -324,7 +470,7 @@ class CavsScanDataTableModel(LACE_DataTableModel):
             #print ("debug n item=",len(row))
             self.appendRow(row)
         self.itemChanged.connect(self.handleItemChanged)
-            
+
     @Slot("QStandardItem*")
     def handleItemChanged(self, item):
         pass
@@ -348,7 +494,7 @@ class CavsScanDataTableModel(LACE_DataTableModel):
             else:
                  bpm1_item.setText("")
             bpm2_item = self.item(cav_ind,4)
-            if(cav_wrapper.bpm_wrapper1 != None): 
+            if(cav_wrapper.bpm_wrapper1 != None):
                 bpm2_item.setText("%10s"%cav_wrapper.bpm_wrapper1.bpm.getName())
             else:
                  bpm2_item.setText("")
@@ -363,12 +509,12 @@ class BPMsForAnalysisTableModel(LACE_DataTableModel):
         super().__init__()
         self.cavs_scan_cntrl = cavs_scan_cntrl
         self.cavs_phase_scan_cntrl = self.cavs_scan_cntrl.cavs_phase_scan_cntrl
-        self.lace_scl_wizard = self.cavs_phase_scan_cntrl.lace_scl_wizard       
+        self.lace_scl_wizard = self.cavs_phase_scan_cntrl.lace_scl_wizard
         self.bpm_wrappers = self.lace_scl_wizard.getBPM_Wrappers()
         self.cav_wrapper = None
         #---- Sets the headers
         #---- OEDA stands for Off Energy Delay Adjustment
-        headers = ["BPM","Good","Use"]  
+        headers = ["BPM","Good","Use"]
         self.setHorizontalHeaderLabels(headers)
         for bpm_ind,bpm_wrapper in enumerate(self.bpm_wrappers):
             bpm_name_item = QStandardItem(bpm_wrapper.getAlias())
@@ -379,12 +525,12 @@ class BPMsForAnalysisTableModel(LACE_DataTableModel):
             self._updateBoolItem(False,bpm_use_item)
             row = [bpm_name_item,bpm_good_item,bpm_use_item]
             self.appendRow(row)
-        self.itemChanged.connect(self.handleItemChanged)    
-            
+        self.itemChanged.connect(self.handleItemChanged)
+
     def setCavWrapper(self,cav_wrapper):
         self.cav_wrapper = cav_wrapper
         self._updateItemsFromData()
-            
+
     @Slot("QStandardItem*")
     def handleItemChanged(self, item):
         # Verify that the modified data is related to the Qt::CheckStateRole role
@@ -407,17 +553,17 @@ class BPMsForAnalysisTableModel(LACE_DataTableModel):
             item = self.item(bpm_ind,2); self._updateBoolItem(use,item)
 
 #----------------------------------------------------------
-# Actions on events with buttons 
+# Actions on events with buttons
 #----------------------------------------------------------
-        
+
 #----------------------------------------------------------
 # Main Controller for this library
 #----------------------------------------------------------
 
 class CavsPhaseScan_Cntrl:
     """
-    It organizes the SCL cavities' phase scans and analysis to get 
-    the initial SCL energy, energies before and after each cavity, and 
+    It organizes the SCL cavities' phase scans and analysis to get
+    the initial SCL energy, energies before and after each cavity, and
     each cavity 1st gap phase of the model. These data allows to create
     a calibrated SCL model for the bunch center acceleration.
     """
@@ -426,8 +572,8 @@ class CavsPhaseScan_Cntrl:
         #---- main widget
         self.mainWidget = QFrame(self.lace_scl_wizard.tabs)
         #---- tab name
-        self.tab_name = "SCL Phase Scan & Analysis"
-        
+        self.tab_name = "SCL Phase Scan and Analysis"
+
         #---- Internal tabs
         self.tabs = QTabWidget()
         self.tabs.setTabPosition(QTabWidget.TabPosition.North)
@@ -435,13 +581,13 @@ class CavsPhaseScan_Cntrl:
 
         #---- Cavities' scan controller
         self.cavs_scan_cntrl = Cavs_Scan_Cntrl(self)
-        
+
         #---- Scan analysis controller
-        self.scan_analysis_cntrl = Scan_Analysis_Cntrl(self)        
+        self.scan_analysis_cntrl = Scan_Analysis_Cntrl(self)
 
         self.tabs.addTab(self.cavs_scan_cntrl.getMainWidget(),self.cavs_scan_cntrl.getTabName())
         self.tabs.addTab(self.scan_analysis_cntrl.getMainWidget(),self.scan_analysis_cntrl.getTabName())
-        
+
         #---- Main window layout
         border_layout = BorderLayout(None, +2)
         border_layout.addWidget(self.tabs, Position.Center)
@@ -455,7 +601,7 @@ class CavsPhaseScan_Cntrl:
     def getMainWidget(self):
         """ Returns the mainWidget (window) of CavsPhaseScan_Cntrl """
         return self.mainWidget
-        
+
     def getTabWidget(self,name):
         """ Returns the mainWidget of the particular 1st level tab """
         widget = None
@@ -467,11 +613,11 @@ class CavsPhaseScan_Cntrl:
     def dumpCntrlDataToDA(self,parent_da):
         """ Puts this controller data into the Data Adaptor """
         return
-       
+
     def readCntrlDataFromDA(self,parent_da):
         """ Reads data for this controller from the Data Adaptor """
         return
-        
+
     def stopAllThreads(self):
         """ Stops all threads of this controller """
         #self.scanStopper.setSetToStop(True)

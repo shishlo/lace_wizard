@@ -26,3 +26,21 @@ class StyleSheetFactory:
                 border-style: inset;   /* Visual effect when pressed */
             }"""
         return buttons_style
+        
+        
+    @staticmethod
+    def groupBoxStyleSheet():
+        groupBox_style = """
+            QGroupBox {
+                font-weight: bold;
+                border: 3px solid lightblue;
+                border-radius: 5px;
+                margin-top: 10px; /* Space for the title */
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top left; /* Position of the title */
+                padding: 0 3px;
+            }
+        """
+        return groupBox_style

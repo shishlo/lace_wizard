@@ -399,12 +399,16 @@ class InitState_Cntrl:
         self.bpms_table_view = BPMsQTableView()
         self.bpms_data_table_model = BPMsDataTableModel(self)
         self.bpms_table_view.setModel(self.bpms_data_table_model)
-        self.bpms_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.bpms_table_view.horizontalHeader().setSectionResizeMode(0,QHeaderView.ResizeToContents)
+        self.bpms_table_view.horizontalHeader().setSectionResizeMode(1,QHeaderView.ResizeToContents)
+        self.bpms_table_view.horizontalHeader().setSectionResizeMode(2,QHeaderView.ResizeToContents)
+        self.bpms_table_view.horizontalHeader().setSectionResizeMode(3,QHeaderView.ResizeMode.Stretch)
 
         self.cavs_table_view = LACE_QTableView()
         cavs_data_table_model = CavsDataTableModel(self)
         self.cavs_table_view.setModel(cavs_data_table_model)
-        self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        #self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
+        self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
         #---- upper buttons panel
         buttons_style = StyleSheetFactory.pushButtonStyleSheet()
