@@ -12,11 +12,16 @@ from PySide6.QtWidgets import (
     QPushButton,
     QWidget,
     QTabWidget,
+    QGroupBox,
     QProgressBar,
     QMainWindow,
     QHeaderView,
     QPlainTextEdit,
-    QCheckBox
+    QCheckBox,
+    QDoubleSpinBox,
+    QLabel,
+    QLineEdit,
+    QRadioButton
     )
 
 from PySide6.QtCore import (
@@ -86,6 +91,9 @@ class Cavs_State_Cntrl:
         
     def getCavWrappers(self):
         return self.cav_wrappers
+        
+    def getBPM_Wrappers(self):
+        return self.bpm_wrappers
 
     def dumpCntrlDataToDA(self,parent_da):
         """ Puts this controller data into the Data Adaptor """
@@ -153,8 +161,9 @@ class CavsDataTableModel(LACE_DataTableModel):
         self.cavs_state_cntrl = self.init_state_cntrl.cavs_state_cntrl
         self.cav_wrappers = self.cavs_state_cntrl.getCavWrappers()
         #---- Sets the headers
-        headers = ["Cavity", "Pos[m]","Good","EPICS_Amp","Epics_Phase","Measured","Analyzed","ModelAmp","ModelPhase","CoeffAmp","PhaseOffset"]
-        headers = ["Cavity", "Pos[m]","Good","EPICS_Amp","Epics_Phase","Measured","Analyzed","ModelAmp",html.unescape("&phi;-model"),"CoeffAmp","PhaseOffset"]
+        headers  = ["Cavity", "Pos[m]","Good","Amp-EPICS",html.unescape("&phi;-EPICS")]
+        headers += ["Measured","Analyzed","Amp-Model",html.unescape("&phi;-model")]
+        headers += ["Amp-Coeff",html.unescape("&phi;-Offset"),"BPM1","BPM2"]
         self.setHorizontalHeaderLabels(headers)
         for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):
             name_item = QStandardItem(cav_wrapper.getAlias())
@@ -170,11 +179,14 @@ class CavsDataTableModel(LACE_DataTableModel):
             model_phase_item = QStandardItem()
             model_coeff_amp_item = QStandardItem()
             phase_offset_item = QStandardItem()
+            bpm1_item = QStandardItem()
+            bpm2_item = QStandardItem()
             row  = [name_item,pos_item,isGood_item,]
             row += [epics_amp_item,epics_phase_item]
             row += [measured_item,analyzed_item]
             row += [model_amp_item,model_phase_item]
             row += [model_coeff_amp_item,phase_offset_item]
+            row += [bpm1_item,bpm2_item]
             self.appendRow(row)
         self.itemChanged.connect(self.handleItemChanged)
             
@@ -198,9 +210,15 @@ class CavsDataTableModel(LACE_DataTableModel):
             self._updateBoolItem(cav_wrapper.isMeasured,self.item(cav_ind,5))
             self._updateBoolItem(cav_wrapper.isAnalyzed,self.item(cav_ind,6))
             model_amp_item  = self.item(cav_ind,7) ; model_amp_item.setText("%6.4f"%cav_wrapper.modelAmp)           
-            model_phase_item = self.item(cav_ind,8) ; model_phase_item.setText("%+7.1f"%cav_wrapper.modelPhase) 
+            model_phase_item = self.item(cav_ind,8) ; model_phase_item.setText("%+6.1f"%cav_wrapper.modelPhase) 
             model_coeff_amp_item = self.item(cav_ind,9) ; model_coeff_amp_item.setText("%6.4f"%cav_wrapper.modelCoeffToEpicsAmp)
-            phase_offset_item = self.item(cav_ind,10) ; phase_offset_item.setText("%7.4f"%cav_wrapper.model_phase_shift)
+            phase_offset_item = self.item(cav_ind,10) ; phase_offset_item.setText("%+6.1f"%cav_wrapper.model_phase_shift)
+            bpm1_item = self.item(cav_ind,11) ;  bpm1_item.setText("")
+            if(cav_wrapper.bpm_wrapper0 != None):  
+                bpm1_item.setText(cav_wrapper.bpm_wrapper0.alias)
+            bpm2_item = self.item(cav_ind,12) ;  bpm2_item.setText(""); 
+            if(cav_wrapper.bpm_wrapper1 != None):  
+                bpm2_item.setText(cav_wrapper.bpm_wrapper1.alias)
 
 class BPMsDataTableModel(LACE_DataTableModel):
     def __init__(self,init_state_cntrl):
@@ -328,6 +346,103 @@ class CleanSelectedCavs_Action:
             print ("debug row=",row)        
         print ("debug clean selected")
         
+class SetBPM12forAllCavs_Action:
+    """ Sets BPM1 and BPM2 for all cavities """ 
+    def __init__(self,init_state_cntrl):
+        self.init_state_cntrl = init_state_cntrl
+        self.cavs_table_view = self.init_state_cntrl.cavs_table_view
+        self.cavs_data_table_model = self.init_state_cntrl.cavs_data_table_model
+        self.cavs_state_cntrl = self.init_state_cntrl.cavs_state_cntrl
+        self.min_dist_bpm12_spin_box = self.init_state_cntrl.min_dist_bpm12_spin_box
+        
+    def performAction(self):
+        cav_wrappers = self.cavs_state_cntrl.getCavWrappers()
+        bpm_wrappers = self.cavs_state_cntrl.getBPM_Wrappers()
+        min_dist_bpm12 = self.min_dist_bpm12_spin_box.value()
+        #---- Let's set BPM1 and BPM2
+        for cav_wrapper in cav_wrappers:
+            if(not cav_wrapper.isGood):
+                cav_wrapper.bpm_wrapper0 = None
+                cav_wrapper.bpm_wrapper1 = None
+                continue
+            cav_pos = cav_wrapper.getPosition()
+            for bpm_wrapper in bpm_wrappers:
+                if(not bpm_wrapper.isGood): continue
+                if(bpm_wrapper.getPosition() > cav_pos):
+                    cav_wrapper.bpm_wrapper0 = bpm_wrapper
+                    break
+            if(cav_wrapper.bpm_wrapper0 == None):
+                print ("debug ERROR cav=",cav_wrapper.alias," cannot get BPM1!")
+                self.cavs_data_table_model.tableChanged()                
+                return
+            for bpm_wrapper in bpm_wrappers:
+                if(not bpm_wrapper.isGood): continue
+                if(bpm_wrapper.getPosition() > cav_wrapper.bpm_wrapper0.getPosition() + min_dist_bpm12):
+                    cav_wrapper.bpm_wrapper1 = bpm_wrapper
+                    break
+            if(cav_wrapper.bpm_wrapper0 == None):
+                print ("debug ERROR cav=",cav_wrapper.alias," cannot get BPM2!")
+                self.cavs_data_table_model.tableChanged()
+                return
+        self.cavs_data_table_model.tableChanged()
+        print ("debug set BPM 1,2 for all cavs.")
+        
+class SetBPM12forSelectedCavs_Action:
+    """ Sets BPM1 or BPM2 for selected Cavities """ 
+    def __init__(self,init_state_cntrl, bpm12_ind = 1):
+        #---- bpm12_ind could be 1 or 2
+        self.bpm12_ind = bpm12_ind
+        self.init_state_cntrl = init_state_cntrl
+        self.cavs_table_view = self.init_state_cntrl.cavs_table_view
+        self.bpms_table_view = self.init_state_cntrl.bpms_table_view
+        self.cavs_state_cntrl = self.init_state_cntrl.cavs_state_cntrl
+        self.cavs_data_table_model = self.init_state_cntrl.cavs_data_table_model
+        
+    def performAction(self):
+        cav_wrappers = self.cavs_state_cntrl.getCavWrappers()
+        bpm_wrappers = self.cavs_state_cntrl.getBPM_Wrappers()
+        #-------------------------------------------------
+        bpm_selection_model = self.bpms_table_view.selectionModel()
+        QModelIndex_list = bpm_selection_model.selectedIndexes()
+        bpm_wrapper = None
+        bpm_name_column_ind = 0
+        for q_model_ind in QModelIndex_list:
+            if(q_model_ind.column() != bpm_name_column_ind): continue
+            row = q_model_ind.row()
+            bpm_wrapper = bpm_wrappers[row]
+            break
+        if(bpm_wrapper == None):
+            print ("debug please select one BPM from the left table.")
+            return
+        #---- here we have bpm_wrapper to set up as BPM1 or BPM2
+        cav_selection_model = self.cavs_table_view.selectionModel()
+        cav_name_column_ind = 0
+        QModelIndex_list = cav_selection_model.selectedIndexes()
+        cav_row_list = []
+        for q_model_ind in QModelIndex_list:
+            if(q_model_ind.column() != cav_name_column_ind): continue
+            row = q_model_ind.row()
+            cav_wrapper = cav_wrappers[row]
+            if(not cav_wrapper.isGood): continue
+            cav_row_list.append(row)
+            if(bpm_wrapper.getPosition() < cav_wrapper.getPosition()):
+                print ("debug ERROR cav=",cav_wrapper.alias," cannot get BPM"+str(self.bpm12_ind)+"!")
+                self.cavs_data_table_model.tableChanged()
+                return
+            if(bpm_wrapper == cav_wrapper.bpm_wrapper0 or bpm_wrapper == cav_wrapper.bpm_wrapper1): continue
+            if(self.bpm12_ind == 1): cav_wrapper.bpm_wrapper0 = bpm_wrapper
+            if(self.bpm12_ind == 2): cav_wrapper.bpm_wrapper1 = bpm_wrapper
+        #---- put BPMs 1 and 2 in order according their positions
+        for cav_wrapper_ind in cav_row_list:
+            cav_wrapper = cav_wrappers[cav_wrapper_ind]
+            if(cav_wrapper.bpm_wrapper0 == None or cav_wrapper.bpm_wrapper1 == None): continue
+            if(cav_wrapper.bpm_wrapper0.getPosition() > cav_wrapper.bpm_wrapper1.getPosition()):
+                bpm_wrapper0 = cav_wrapper.bpm_wrapper0
+                cav_wrapper.bpm_wrapper0 = cav_wrapper.bpm_wrapper1
+                cav_wrapper.bpm_wrapper1 = bpm_wrapper0 
+        print ("debug set BPM1 for selected cavs.")
+        self.cavs_data_table_model.tableChanged()
+        
 class BPMReadPhaseOffset_Action:
     """ Read BPM Phase Offsets from external .dat file """ 
     def __init__(self,init_state_cntrl):
@@ -361,7 +476,8 @@ class BPMSaveBoth_Action:
         self.init_state_cntrl = init_state_cntrl
         
     def performAction(self):
-        print ("debug save bpm Phase Offsets and OEDA")        
+        print ("debug save bpm Phase Offsets and OEDA")
+        
         
 #----------------------------------------------------------
 # Main Controller for this library
@@ -405,8 +521,8 @@ class InitState_Cntrl:
         self.bpms_table_view.horizontalHeader().setSectionResizeMode(3,QHeaderView.ResizeMode.Stretch)
 
         self.cavs_table_view = LACE_QTableView()
-        cavs_data_table_model = CavsDataTableModel(self)
-        self.cavs_table_view.setModel(cavs_data_table_model)
+        self.cavs_data_table_model = CavsDataTableModel(self)
+        self.cavs_table_view.setModel(self.cavs_data_table_model)
         #self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
 
@@ -417,36 +533,86 @@ class InitState_Cntrl:
         remove_all_button     = QPushButton(text="Remove All Scan Results",parent=None)
         remove_selected_button = QPushButton(text="Remove Selected Scan Results",parent=None)
         
+        min_dist_bpm12_label = QLabel("Min Dist. BPM 1-2 [m]=")
+        self.min_dist_bpm12_spin_box = QDoubleSpinBox()
+        self.min_dist_bpm12_spin_box.setRange(0.,100.)  # Set min/max range
+        self.min_dist_bpm12_spin_box.setDecimals(0)     # Set precision to 2 decimal places
+        self.min_dist_bpm12_spin_box.setSingleStep(1.0) # Set step size for arrow buttons
+        self.min_dist_bpm12_spin_box.setValue(25)       # Set default value        
+        set_bpm12_button = QPushButton(text="Set BPM1+BPM2 for All Cavs.",parent=None)
+        set_bpm1_button = QPushButton(text="Set BPM1 for Slected Cavs.",parent=None)
+        set_bpm2_button = QPushButton(text="Set BPM2 for Slected Cavs.",parent=None)
+        
         init_all_button.setStyleSheet(buttons_style)
         init_selected_button.setStyleSheet(buttons_style)
         remove_all_button.setStyleSheet(buttons_style)
         remove_selected_button.setStyleSheet(buttons_style)
+        
+        set_bpm12_button.setStyleSheet(buttons_style)
+        set_bpm1_button.setStyleSheet(buttons_style)
+        set_bpm2_button.setStyleSheet(buttons_style) 
         
         #---- cavs button action assignment
         initAllCavs_Action = InitAllCavs_Action(self)
         initSelectedCavs_Action = InitSelectedCavs_Action(self)
         cleanAllCavs_Action = CleanAllCavs_Action(self)
         cleanSelectedCavs_Action = CleanSelectedCavs_Action(self)
+        setBPM12forAllCavs_Action = SetBPM12forAllCavs_Action(self)
+        setBPM1forSelectedCavs_Action = SetBPM12forSelectedCavs_Action(self,1)
+        setBPM2forSelectedCavs_Action = SetBPM12forSelectedCavs_Action(self,2)
+        
         init_all_button.clicked.connect(lambda: initAllCavs_Action.performAction())
         init_selected_button.clicked.connect(lambda: initSelectedCavs_Action.performAction())  
         remove_all_button.clicked.connect(lambda: cleanAllCavs_Action.performAction())     
         remove_selected_button.clicked.connect(lambda: cleanSelectedCavs_Action.performAction())
+        set_bpm12_button.clicked.connect(lambda: setBPM12forAllCavs_Action.performAction())   
+        set_bpm1_button.clicked.connect(lambda: setBPM1forSelectedCavs_Action.performAction())   
+        set_bpm2_button.clicked.connect(lambda: setBPM2forSelectedCavs_Action.performAction())   
 
         upper_view = QWidget()
+        
+        h_1_view = QWidget()
+        hlayout_1 = QHBoxLayout()
+        hlayout_1.addWidget(init_all_button)
+        hlayout_1.addWidget(init_selected_button)
+        hlayout_1.addWidget(remove_all_button)
+        hlayout_1.addWidget(remove_selected_button)
+        hlayout_1.setSpacing(0)
+        hlayout_1.setContentsMargins(0, 0, 0, 0)        
+        h_1_view.setLayout(hlayout_1)
+       
+        
+        h_2_view = QWidget()
+        hlayout_2 = QHBoxLayout()
+        hlayout_2.addWidget(min_dist_bpm12_label)
+        hlayout_2.addWidget(self.min_dist_bpm12_spin_box)
+        hlayout_2.addWidget(set_bpm12_button)
+        hlayout_2.addWidget(set_bpm1_button)
+        hlayout_2.addWidget(set_bpm2_button)
+        hlayout_2.setAlignment(Qt.AlignLeft)
+        hlayout_2.setSpacing(0)
+        hlayout_2.setContentsMargins(0, 0, 0, 0)         
+        h_2_view.setLayout(hlayout_2)
+        
+        
+        upper_layout = QVBoxLayout()
+        upper_layout.addWidget(h_1_view)
+        upper_layout.addWidget(h_2_view)
+        upper_layout.setSpacing(0)
+        upper_layout.setContentsMargins(0, 0, 0, 0)         
+        upper_view.setLayout(upper_layout)
+        
+        central_view = QWidget()
+        central_layout = QHBoxLayout()
+        central_layout.addWidget(self.bpms_table_view)
+        central_layout.addWidget(self.cavs_table_view,1)
+        central_view.setLayout(central_layout)
+        
+        cav_init_all_layout = QVBoxLayout()
+        cav_init_all_layout.addWidget(upper_view)
+        cav_init_all_layout.addWidget(central_view)
 
-        hlayout = QHBoxLayout(upper_view)
-        hlayout.addWidget(init_all_button)
-        hlayout.addWidget(init_selected_button)
-        hlayout.addWidget(remove_all_button)
-        hlayout.addWidget(remove_selected_button)
-
-        #---- Border Layout for self.cavs_state_cntrl
-        border_layout = BorderLayout(None)
-
-        border_layout.addWidget(self.cavs_table_view, Position.Center)
-        border_layout.addWidget(self.bpms_table_view, Position.West)
-        border_layout.addWidget(upper_view, Position.North)
-        self.cavs_state_cntrl.getMainWidget().setLayout(border_layout)
+        self.cavs_state_cntrl.getMainWidget().setLayout(cav_init_all_layout)
 
         #---------------------------------------------------
         #---- Let's make self.bpms_state_cntrl tab window
@@ -472,11 +638,11 @@ class InitState_Cntrl:
         bpmReadPhaseOffset_Action = BPMReadPhaseOffset_Action(self)
         bpmReadOEDA_Action = BPMReadOEDA_Action(self)
         bpmReadBoth_Action = BPMReadBoth_Action(self)
-        self.bpmSaveBoth_Action = BPMSaveBoth_Action(self)
+        bpmSaveBoth_Action = BPMSaveBoth_Action(self)
         bpmReadPhaseOffset_button.clicked.connect(lambda: bpmReadPhaseOffset_Action.performAction())
         bpmReadOEDA_button.clicked.connect(lambda: bpmReadOEDA_Action.performAction())  
         bpmReadBoth_button.clicked.connect(lambda: bpmReadBoth_Action.performAction())     
-        bpmSaveBoth_button.clicked.connect(lambda: self.bpmSaveBoth_Action.performAction())
+        bpmSaveBoth_button.clicked.connect(lambda: bpmSaveBoth_Action.performAction())
         
         upper_view = QWidget()
 

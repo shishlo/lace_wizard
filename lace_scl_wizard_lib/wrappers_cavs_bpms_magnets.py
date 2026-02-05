@@ -73,6 +73,9 @@ class Cavity_Wrapper:
         
     def getAlias(self):
         return self.alias 
+ 
+    def getPosition(self):
+        return self.model_cav.getPosition()       
         
     def connectPVs(self):
         time.sleep(0.05)
