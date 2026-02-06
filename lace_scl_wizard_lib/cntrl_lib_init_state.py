@@ -2,6 +2,7 @@
 Controller for initialization of the SCL (CCL+HEBT also) linac from EPICS 
 """
 import sys
+import time
 import html
 
 from PySide6.QtWidgets import (
@@ -34,7 +35,8 @@ from PySide6.QtCore import (
 from PySide6.QtGui import (
     QStandardItemModel, QStandardItem,
     QTextDocument,
-    QIcon
+    QIcon,
+    QBrush
     )
 
 from gui_lib.borderlayout import BorderLayout, Position
@@ -214,7 +216,11 @@ class CavsDataTableModel(LACE_DataTableModel):
             model_coeff_amp_item = self.item(cav_ind,9) ; model_coeff_amp_item.setText("%6.4f"%cav_wrapper.modelCoeffToEpicsAmp)
             phase_offset_item = self.item(cav_ind,10) ; phase_offset_item.setText("%+6.1f"%cav_wrapper.model_phase_shift)
             bpm1_item = self.item(cav_ind,11) ;  bpm1_item.setText("")
-            if(cav_wrapper.bpm_wrapper0 != None):  
+            if(cav_wrapper.bpm_wrapper0 != None):
+                if(cav_wrapper.bpm_wrapper0.isGood):
+                    bpm1_item.setForeground(QBrush(Qt.GlobalColor.black))
+                else:
+                    bpm1_item.setForeground(QBrush(Qt.GlobalColor.red))
                 bpm1_item.setText(cav_wrapper.bpm_wrapper0.alias)
             bpm2_item = self.item(cav_ind,12) ;  bpm2_item.setText(""); 
             if(cav_wrapper.bpm_wrapper1 != None):  
@@ -252,6 +258,7 @@ class BPMsDataTableModel(LACE_DataTableModel):
         """ Only the Good descriptor is allowed to be changed from the Table View """
         if(item.isCheckable() and item.checkState() in (Qt.Checked, Qt.Unchecked)):
             self.bpm_wrappers[item.row()].isGood = self._getValueOfBoolItem(item)
+            self.updateDependentTables()
 
     def _updateItemsFromData(self):
         for bpm_ind,bpm_wrapper in enumerate(self.bpm_wrappers):
@@ -302,50 +309,93 @@ class BPMsParamsTableModel(LACE_DataTableModel):
 #----------------------------------------------------------
 # Actions on events with buttons 
 #----------------------------------------------------------
-class InitAllCavs_Action:
+class InitCavs_Action:
     """ Initialization all cavities """ 
     def __init__(self,init_state_cntrl):
         self.init_state_cntrl = init_state_cntrl
-        
-    def performAction(self):
-        print ("debug init all")
-        
-class InitSelectedCavs_Action:
-    """ Initialization all cavities """ 
-    def __init__(self,init_state_cntrl):
-        self.init_state_cntrl = init_state_cntrl
+        self.cavs_state_cntrl = self.init_state_cntrl.cavs_state_cntrl
         self.cavs_table_view = self.init_state_cntrl.cavs_table_view
-        
+        self.cavs_data_table_model = self.init_state_cntrl.cavs_data_table_model
+        self.bpms_data_table_model = self.init_state_cntrl.bpms_data_table_model
+      
+    def _performAction(self,cav_wrappers):
+        """ It connects the cavity wrappers from cav_wrappers list """
+        bpm_wrappers = self.cavs_state_cntrl.getBPM_Wrappers()
+        sleep_time = 0.5
+        n_repeat = 3
+        bad_cavs = []
+        bad_bpms = []
+        for ind in range(n_repeat):
+            bad_cavs = []
+            bad_bpms = []
+            for cav_wrapper in cav_wrappers:
+                if(not cav_wrapper.connectPVs()): bad_cavs.append(cav_wrapper)
+            for bpm_wrapper in bpm_wrappers:
+                if(not bpm_wrapper.connectPVs()): bad_bpms.append(bpm_wrapper)
+            time.sleep(0.5)
+        for cav_wrapper in bad_cavs:
+            cav_wrapper.isGood = False
+            cav_wrapper.cleanAllScanData()
+        for bpm_wrapper in bad_bpms:
+            bpm_wrapper.isGood = False
+        self.cavs_data_table_model.tableChanged()
+        self.bpms_data_table_model.tableChanged()
+        print ("debug init all")        
+      
     def performAction(self):
-        selection_model = self.cavs_table_view.selectionModel()
-        QModelIndex_list = selection_model.selectedRows()
-        for q_model_ind in QModelIndex_list:
-            row = q_model_ind.row()
-            print ("debug row=",row)
-        print ("debug init selected")
+        cav_wrappers = self.cavs_state_cntrl.getCavWrappers()
+        self._performAction(cav_wrappers)
         
-class CleanAllCavs_Action:
+    def performActionForSelected(self):
+        cav_wrappers = self.cavs_state_cntrl.getCavWrappers()
+        cav_selection_model = self.cavs_table_view.selectionModel()
+        cav_name_column_ind = 0
+        QModelIndex_list = cav_selection_model.selectedIndexes()
+        cavs_list = []
+        for q_model_ind in QModelIndex_list:
+            if(q_model_ind.column() != cav_name_column_ind): continue
+            row = q_model_ind.row()
+            cav_wrapper = cav_wrappers[row]
+            if(not cav_wrapper.isGood):
+                cav_wrapper.cleanAllScanData()
+                continue
+            cavs_list.append(cav_wrapper)
+        self._performAction(cavs_list)
+        
+class CleanCavs_Action:
     """ Clean all scan data for all cavities """ 
     def __init__(self,init_state_cntrl):
         self.init_state_cntrl = init_state_cntrl
+        self.cavs_state_cntrl = self.init_state_cntrl.cavs_state_cntrl
+        self.cavs_table_view = self.init_state_cntrl.cavs_table_view
+        self.cavs_data_table_model = self.init_state_cntrl.cavs_data_table_model
+
+    def _performAction(self,cav_wrappers):
+        for cav_wrapper in cav_wrappers:
+            cav_wrapper.cleanAllScanData()
+        self.cavs_data_table_model.tableChanged()
         
     def performAction(self):
+        self._performAction(self.cavs_state_cntrl.getCavWrappers())
         print ("debug clean all")
         
-class CleanSelectedCavs_Action:
-    """ Clean all scan data for selcted cavities """ 
-    def __init__(self,init_state_cntrl):
-        self.init_state_cntrl = init_state_cntrl
-        self.cavs_table_view = self.init_state_cntrl.cavs_table_view
-        
-    def performAction(self):
-        selection_model = self.cavs_table_view.selectionModel()
-        QModelIndex_list = selection_model.selectedRows()
+    def performActionForSelected(self):    
+        cav_wrappers = self.cavs_state_cntrl.getCavWrappers()
+        cav_selection_model = self.cavs_table_view.selectionModel()
+        cav_name_column_ind = 0
+        QModelIndex_list = cav_selection_model.selectedIndexes()
+        cavs_list = []
         for q_model_ind in QModelIndex_list:
+            if(q_model_ind.column() != cav_name_column_ind): continue
             row = q_model_ind.row()
-            print ("debug row=",row)        
-        print ("debug clean selected")
-        
+            cav_wrapper = cav_wrappers[row]
+            if(not cav_wrapper.isGood):
+                cav_wrapper.cleanAllScanData()
+                continue
+            cavs_list.append(cav_wrapper)
+        self._performAction(cavs_list)        
+        print ("debug clean selected")   
+
 class SetBPM12forAllCavs_Action:
     """ Sets BPM1 and BPM2 for all cavities """ 
     def __init__(self,init_state_cntrl):
@@ -525,6 +575,8 @@ class InitState_Cntrl:
         self.cavs_table_view.setModel(self.cavs_data_table_model)
         #self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        
+        self.bpms_data_table_model.addDependentTableModel(self.cavs_data_table_model)
 
         #---- upper buttons panel
         buttons_style = StyleSheetFactory.pushButtonStyleSheet()
@@ -553,18 +605,16 @@ class InitState_Cntrl:
         set_bpm2_button.setStyleSheet(buttons_style) 
         
         #---- cavs button action assignment
-        initAllCavs_Action = InitAllCavs_Action(self)
-        initSelectedCavs_Action = InitSelectedCavs_Action(self)
-        cleanAllCavs_Action = CleanAllCavs_Action(self)
-        cleanSelectedCavs_Action = CleanSelectedCavs_Action(self)
+        initCavs_Action = InitCavs_Action(self)
+        cleanCavs_Action = CleanCavs_Action(self)
         setBPM12forAllCavs_Action = SetBPM12forAllCavs_Action(self)
         setBPM1forSelectedCavs_Action = SetBPM12forSelectedCavs_Action(self,1)
         setBPM2forSelectedCavs_Action = SetBPM12forSelectedCavs_Action(self,2)
         
-        init_all_button.clicked.connect(lambda: initAllCavs_Action.performAction())
-        init_selected_button.clicked.connect(lambda: initSelectedCavs_Action.performAction())  
-        remove_all_button.clicked.connect(lambda: cleanAllCavs_Action.performAction())     
-        remove_selected_button.clicked.connect(lambda: cleanSelectedCavs_Action.performAction())
+        init_all_button.clicked.connect(lambda: initCavs_Action.performAction())
+        init_selected_button.clicked.connect(lambda: initCavs_Action.performActionForSelected())  
+        remove_all_button.clicked.connect(lambda: cleanCavs_Action.performAction())     
+        remove_selected_button.clicked.connect(lambda: cleanCavs_Action.performActionForSelected())
         set_bpm12_button.clicked.connect(lambda: setBPM12forAllCavs_Action.performAction())   
         set_bpm1_button.clicked.connect(lambda: setBPM1forSelectedCavs_Action.performAction())   
         set_bpm2_button.clicked.connect(lambda: setBPM2forSelectedCavs_Action.performAction())   

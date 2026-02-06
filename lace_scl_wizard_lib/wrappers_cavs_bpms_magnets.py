@@ -1,5 +1,3 @@
-
-
 import time
 
 #---- Channel access
@@ -48,7 +46,7 @@ class Cavity_Wrapper:
         self.modelAmp = 0.
         self.modelPhase = 0.       
         self.modelCoeffToEpicsAmp = 0.
-        #---- Results of the sin-like analysis: bpm phases vs. cav. phase, amp in degrees 
+        #---- Results of the sin-like analysis: bpm phases vs. cav. phase, amplitude of sin in degrees 
         self.sin_phase_func_amp = 0.
         self.sin_phase_func_amp_err = 0.
         #---- accelerating phase of the cavity: self.epicsPhase shift from cav. phase for min phase of BPMs
@@ -75,10 +73,31 @@ class Cavity_Wrapper:
         return self.alias 
  
     def getPosition(self):
-        return self.model_cav.getPosition()       
+        return self.model_cav.getPosition()
+        
+    def cleanAllScanData(self):
+        self.isMeasured = False
+        self.isAnalyzed = False
+        #----cavity's parameters 
+        self.epicsAmp = 0.
+        self.epicsPhase = 0.
+        self.epicsAmpInit = 0.
+        self.epicsPhaseInit = 0.
+        #---- average acceleration phase
+        self.synch_pahse = -18.
+        #-- design parameters will be defined after analysis of the phase scan data
+        self.modelAmp = 0.
+        self.modelPhase = 0.       
+        self.modelCoeffToEpicsAmp = 0.
+        #---- Results of the sin-like analysis: bpm phases vs. cav. phase, amplitude of sin in degrees 
+        self.sin_phase_func_amp = 0.
+        self.sin_phase_func_amp_err = 0.
+        #---- accelerating phase of the cavity: self.epicsPhase shift from cav. phase for min phase of BPMs
+        self.synch_acc_phase = 0.
+        #---- This is a phase shift between EPICS and model phases
+        self.model_phase_shift = 0.      
         
     def connectPVs(self):
-        time.sleep(0.05)
         self.is_connected = True
         if(self.cav_amp_pv.connected and self.cav_phase_pv.connected \
             and self.cav_blankig_pv.connected):
@@ -141,6 +160,14 @@ class BPM_Wrapper:
         
     def getPosition(self):
         return self.model_bpm.getPosition()
+
+    def connectPVs(self):
+        """ It connects all BPM PVs to EPICS """
+        self.is_connected = True
+        if(self.bpm_amp_pv.connected and self.bpm_phase_pv.connected and self.bpm_oeda_pv.connected):
+            return self.is_connected
+        self.is_connected = False
+        return self.is_connected
         
     def setOEDA_EPICS_TimeShift(self,oeda_time_shift):
         """ OEDA stands for Off Energy Delay Adjustment in [ms] """
@@ -161,15 +188,7 @@ class BPM_Wrapper:
     def getPhasePV(self):
         """ Returns BPM phase PV instance """
         return self.bpm_phase_pv
-        
-    def connectPVs(self):
-        """ It connects all BPM PVs to EPICS """
-        self.is_connected = True
-        if(self.bpm_amp_pv.connected and self.bpm_phase_pv.connected):
-            return self.is_connected
-        self.is_connected = False
-        return self.is_connected
-        
+
     def getEPICS_Phase(self):
         """ Returns BPM EPICS phase value """
         if(self.is_connected):

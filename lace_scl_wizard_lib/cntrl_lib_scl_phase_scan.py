@@ -89,6 +89,7 @@ class Cavs_Scan_Cntrl:
         self.cavs_table_view.setModel(self.cavs_data_table_model)
         #self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.cavs_table_view.selectionModel().selectionChanged.connect(self.cavsSelectionChanged)
 
         #---- BPMs that will be used for analysis
         self.bpms_table_view = LACE_QTableView()
@@ -131,7 +132,6 @@ class Cavs_Scan_Cntrl:
         
         self.getMainWidget().setLayout(main_layout)
         
-
     def getTabName(self):
         """ Returns the tab name the controller """
         return self.tab_name
@@ -142,6 +142,19 @@ class Cavs_Scan_Cntrl:
 
     def getCavWrappers(self):
         return self.cav_wrappers
+        
+    def cavsSelectionChanged(self,selected,deselected):
+        """ Updates right BPM table for particular cavity with selected index """
+        #---- selected.indexes() and deselected.indexes() with index.row() and index.column()
+        if(len(selected.indexes()) <= 0):
+            self.bpms_tab_panel.setTabText(0,"Cavity None")
+            self.bpms_use_table_model.setCavWrapper(None)
+            return
+        row = selected.indexes()[0].row()
+        #----
+        cav_wrapper = self.cav_wrappers[row]
+        self.bpms_tab_panel.setTabText(0,cav_wrapper.getAlias())
+        self.bpms_use_table_model.setCavWrapper(cav_wrapper)
 
     def dumpCntrlDataToDA(self,parent_da):
         """ Puts this controller data into the Data Adaptor """
@@ -195,7 +208,34 @@ class Scan_Analysis_Cntrl:
         """ Stops all threads of this controller """
         #self.scanStopper.setSetToStop(True)
         return
+#----------------------------------------------------------
+# Actions on events with buttons 
+#----------------------------------------------------------
+class StartScan_Action:
+    """ Starts the phase scans of all or selected cavities. """ 
+    def __init__(self,upper_panel_cntrl):
+        """
+        self.upper_panel_cntrl = upper_panel_cntrl
+        self.cavs_scan_cntrl = self.upper_panel_cntrl.cavs_scan_cntrl
+        self.cavs_phase_scan_cntrl = self.upper_panel_cntrl.cavs_phase_scan_cntrl
+        self.cavs_table_view = self.cavs_scan_cntrl.cavs_table_view
+        self.cavs_data_table_model = self.cavs_scan_cntrl.cavs_data_table_model
+        """
 
+    def _performAction(self,cav_wrappers):
+        """ It starts the phase scan the cavities from cav_wrappers list """
+        wait_time = self.upper_panel_cntrl.scan_wait_time_spin_box.value()
+        max_sin_amp_err = self.upper_panel_cntrl.max_sin_amp_err_spin_box.value()
+
+class StopScan_Action:
+    """ Stop the phase scans for all cavities. """ 
+    def __init__(self,upper_panel_cntrl):
+        pass
+
+    def _performAction(self,cav_wrappers):
+        """ It starts the phase scan the cavities from cav_wrappers list """
+        wait_time = self.upper_panel_cntrl.scan_wait_time_spin_box.value()
+        max_sin_amp_err = self.upper_panel_cntrl.max_sin_amp_err_spin_box.value()
 
 #----------------------------------------------------------
 #  Subpanels for knobs and tables
@@ -212,7 +252,6 @@ class UpperScanPanelCntrl:
         self.cav_wrappers = self.lace_scl_wizard.getCavWrappers()
         self.bpm_wrappers = self.lace_scl_wizard.getBPM_Wrappers()
         #---- main widget
-        #self.mainWidget = QFrame(self.cavs_phase_scan_cntrl.tabs)
         self.mainWidget = QGroupBox()
 
         buttons_style = StyleSheetFactory.pushButtonStyleSheet()
@@ -310,7 +349,15 @@ class UpperScanPanelCntrl:
 
         stop_scan_button = QPushButton(text="Stop Scan",parent=None)
         stop_scan_button.setStyleSheet(buttons_style)
+        
+         #---- cavs button action assignment
+        startScan_Action = StartScan_Action(self)
+        stopScan_Action = StopScan_Action(self)
 
+        start_scan_button.clicked.connect(lambda: startScan_Action.performAction())
+        start_scan_selected_button.clicked.connect(lambda: startScan_Action.performActionForSelected())
+        stop_scan_button.clicked.connect(lambda: stopScan_Action.performAction())
+        
         self.scan_status_text = QLineEdit("Scan status:")
         self.scan_status_text.setStyleSheet("color: blue; background-color: white;")
 
@@ -546,7 +593,7 @@ class BPMsForAnalysisTableModel(LACE_DataTableModel):
                 self._updateBoolItem(False,self.item(bpm_ind,2))
             return
         for bpm_ind,bpm_wrapper in enumerate(self.bpm_wrappers):
-            item = self.item(bpm_ind,2); self._updateBoolItem(bpm_wrapper.isGood,item)
+            item = self.item(bpm_ind,1); self._updateBoolItem(bpm_wrapper.isGood,item)
             use = self.cav_wrapper.bpm_wrappers_useInPhaseAnalysis[bpm_ind]
             if(bpm_wrapper.isGood != True): use = False
             self.cav_wrapper.bpm_wrappers_useInPhaseAnalysis[bpm_ind] = use
