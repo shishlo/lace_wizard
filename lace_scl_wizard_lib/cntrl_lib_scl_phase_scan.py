@@ -56,6 +56,7 @@ from gui_lib.borderlayout import BorderLayout, Position
 from gui_lib.style_sheets_lib import StyleSheetFactory
 from gui_lib.table_view_model_lib import LACE_QTableView, LACE_DataTableModel
 from .wrappers_cavs_bpms_magnets import Cavity_Wrapper, BPM_Wrapper
+from .phase_scan_lib import ScanStateController, PhaseScan_Runner
 
 #----------------------------------------------------------
 # Custom QtWidgets
@@ -106,10 +107,10 @@ class Cavs_Scan_Cntrl:
         self.bpms_tab_panel.addTab(self.bpms_table_view,"Cavity None")
 
         #---- upper panel
-        self.upper_panel_cntrl = UpperScanPanelCntrl(self.cavs_phase_scan_cntrl)
+        self.upper_panel_cntrl = UpperScanPanelCntrl(self)
 
         #---- bottom panel with plots and bpm data cleaning buttons
-        self.bottom_panel_cntrl = BottomScanPanelCntrl(self.cavs_phase_scan_cntrl)
+        self.bottom_panel_cntrl = BottomScanPanelCntrl(self)
         
         central_layout = QHBoxLayout()
         central_layout.setSpacing(0)
@@ -131,6 +132,10 @@ class Cavs_Scan_Cntrl:
         main_layout.addWidget(self.bottom_panel_cntrl.getMainWidget(),1)
         
         self.getMainWidget().setLayout(main_layout)
+        
+        #---- Scan state controller aka Scan Stopper
+        self.scan_stopper = ScanStateController()
+        self.threadpool = QThreadPool()
         
     def getTabName(self):
         """ Returns the tab name the controller """
@@ -211,42 +216,99 @@ class Scan_Analysis_Cntrl:
 #----------------------------------------------------------
 # Actions on events with buttons 
 #----------------------------------------------------------
+class SetSyncPhase_Action:
+    """ Sets syncronous accelerating phase to the selected cavities. """
+    def __init__(self,upper_panel_cntrl):
+        self.upper_panel_cntrl = upper_panel_cntrl
+        
+    def performAction(self):
+        """ Sets syncronous accelerating phase to the selected cavities. """
+        synch_phase = self.upper_panel_cntrl.sync_phase_double_spin_box.value()
+        self.cavs_scan_cntrl = self.upper_panel_cntrl.cavs_scan_cntrl
+        cav_selection_model = self.cavs_scan_cntrl.cavs_table_view.selectionModel()
+        cav_wrappers = self.cavs_scan_cntrl.cav_wrappers
+        cav_name_column_ind = 0
+        QModelIndex_list = cav_selection_model.selectedIndexes()
+        cavs_list = []
+        for q_model_ind in QModelIndex_list:
+            if(q_model_ind.column() != cav_name_column_ind): continue
+            row = q_model_ind.row()
+            cav_wrapper = cav_wrappers[row]
+            if(not cav_wrapper.isGood):
+                cav_wrapper.cleanAllScanData()
+                continue
+            cavs_list.append(cav_wrapper)
+        for cav_wrapper in cavs_list:
+            cav_wrapper.synch_acc_phase = synch_phase
+        cav_selection_model.clearSelection()
+        self.cavs_scan_cntrl.cavs_data_table_model.tableChanged()
+        print ("debug Sets syncronous accelerating phase.")
+        
+
 class StartScan_Action:
     """ Starts the phase scans of all or selected cavities. """ 
     def __init__(self,upper_panel_cntrl):
-        """
         self.upper_panel_cntrl = upper_panel_cntrl
-        self.cavs_scan_cntrl = self.upper_panel_cntrl.cavs_scan_cntrl
-        self.cavs_phase_scan_cntrl = self.upper_panel_cntrl.cavs_phase_scan_cntrl
-        self.cavs_table_view = self.cavs_scan_cntrl.cavs_table_view
-        self.cavs_data_table_model = self.cavs_scan_cntrl.cavs_data_table_model
-        """
 
     def _performAction(self,cav_wrappers):
         """ It starts the phase scan the cavities from cav_wrappers list """
         wait_time = self.upper_panel_cntrl.scan_wait_time_spin_box.value()
         max_sin_amp_err = self.upper_panel_cntrl.max_sin_amp_err_spin_box.value()
+        self.cavs_scan_cntrl = self.upper_panel_cntrl.cavs_scan_cntrl
+        self.cavs_phase_scan_cntrl = self.upper_panel_cntrl.cavs_phase_scan_cntrl
+        self.cavs_table_view = self.cavs_scan_cntrl.cavs_table_view
+        self.cavs_scan_cntrl.cavs_table_view.selectionModel().clearSelection()
+        phase_scan_runner = PhaseScan_Runner(self.cavs_scan_cntrl,cav_wrappers)
+        self.cavs_scan_cntrl.threadpool.start(phase_scan_runner)
+        print ("debug Starts the phase scans for all or selected cavities. ")
+        
+    def performActionForSelected(self):
+        self.cavs_scan_cntrl = self.upper_panel_cntrl.cavs_scan_cntrl
+        cav_selection_model = self.cavs_scan_cntrl.cavs_table_view.selectionModel()
+        cav_wrappers = self.cavs_scan_cntrl.cav_wrappers
+        cav_name_column_ind = 0
+        QModelIndex_list = cav_selection_model.selectedIndexes()
+        cavs_list = []
+        for q_model_ind in QModelIndex_list:
+            if(q_model_ind.column() != cav_name_column_ind): continue
+            row = q_model_ind.row()
+            cav_wrapper = cav_wrappers[row]
+            if(not cav_wrapper.isGood):
+                cav_wrapper.cleanAllScanData()
+                continue
+            cavs_list.append(cav_wrapper)
+        self._performAction(cavs_list)        
+        print ("debug start scans for selected cavities.")   
+        
+    def performAction(self):
+        self.cavs_scan_cntrl = self.upper_panel_cntrl.cavs_scan_cntrl
+        cav_wrappers = self.cavs_scan_cntrl.cav_wrappers
+        self._performAction(cav_wrappers)
+        print ("debug Starts the phase scans for all cavities. ")
 
 class StopScan_Action:
     """ Stop the phase scans for all cavities. """ 
     def __init__(self,upper_panel_cntrl):
-        pass
+        self.upper_panel_cntrl = upper_panel_cntrl
 
-    def _performAction(self,cav_wrappers):
-        """ It starts the phase scan the cavities from cav_wrappers list """
-        wait_time = self.upper_panel_cntrl.scan_wait_time_spin_box.value()
-        max_sin_amp_err = self.upper_panel_cntrl.max_sin_amp_err_spin_box.value()
+    def performAction(self):
+        """ It stops the phase scan """
+        self.cavs_scan_cntrl = self.upper_panel_cntrl.cavs_scan_cntrl
+        self.scan_stopper = self.cavs_scan_cntrl.scan_stopper
+        self.scan_stopper.setShouldStop(True)
+        print ("debug Stops the phase scans. ")
 
 #----------------------------------------------------------
-#  Subpanels for knobs and tables
+#  Sub-panels for knobs and tables
 #----------------------------------------------------------
 class UpperScanPanelCntrl:
     """
     The upper panel in the SCL Phase Scan tab with parameters of the scan
     and start-stop_resume knobs.
     """
-    def __init__(self,cavs_phase_scan_cntrl):
-        self.cavs_phase_scan_cntrl = cavs_phase_scan_cntrl
+    def __init__(self,cavs_scan_cntrl):
+        self.cavs_scan_cntrl = cavs_scan_cntrl
+        self.cavs_phase_scan_cntrl = self.cavs_scan_cntrl.cavs_phase_scan_cntrl
         self.lace_scl_wizard = self.cavs_phase_scan_cntrl.lace_scl_wizard
         self.model_cavs = self.lace_scl_wizard.getOM().getModelCavs()
         self.cav_wrappers = self.lace_scl_wizard.getCavWrappers()
@@ -290,7 +352,7 @@ class UpperScanPanelCntrl:
         self.sync_phase_double_spin_box.setRange(-180.0, 180.0) # Set min/max range
         self.sync_phase_double_spin_box.setDecimals(1)          # Set precision to 2 decimal places
         self.sync_phase_double_spin_box.setSingleStep(0.1)      # Set step size for arrow buttons
-        self.sync_phase_double_spin_box.setValue(15.0)          # Set default value
+        self.sync_phase_double_spin_box.setValue(-15.0)         # Set default value
 
         scan_wait_time_label = QLabel("   Scan Wait t[sec]=")
         self.scan_wait_time_spin_box = QDoubleSpinBox()
@@ -350,10 +412,12 @@ class UpperScanPanelCntrl:
         stop_scan_button = QPushButton(text="Stop Scan",parent=None)
         stop_scan_button.setStyleSheet(buttons_style)
         
-         #---- cavs button action assignment
+        #---- cavs button action assignment
+        setSyncPhase_Action = SetSyncPhase_Action(self) 
         startScan_Action = StartScan_Action(self)
         stopScan_Action = StopScan_Action(self)
 
+        setSynchPhase_button.clicked.connect(lambda: setSyncPhase_Action.performAction())
         start_scan_button.clicked.connect(lambda: startScan_Action.performAction())
         start_scan_selected_button.clicked.connect(lambda: startScan_Action.performActionForSelected())
         stop_scan_button.clicked.connect(lambda: stopScan_Action.performAction())
@@ -383,14 +447,15 @@ class BottomScanPanelCntrl:
     The bottom panel in the SCL Phase Scan tab with BPMs phases and amplitudes
     vs. cavity's phases and BPMs data cleaning control buttons.
     """
-    def __init__(self,cavs_phase_scan_cntrl):
-        self.cavs_phase_scan_cntrl = cavs_phase_scan_cntrl
+    def __init__(self,cavs_scan_cntrl):
+        self.cavs_scan_cntrl = cavs_scan_cntrl
+        self.cavs_phase_scan_cntrl = self.cavs_scan_cntrl.cavs_phase_scan_cntrl        
         self.lace_scl_wizard = self.cavs_phase_scan_cntrl.lace_scl_wizard
         self.model_cavs = self.lace_scl_wizard.getOM().getModelCavs()
         self.cav_wrappers = self.lace_scl_wizard.getCavWrappers()
         self.bpm_wrappers = self.lace_scl_wizard.getBPM_Wrappers()
         #---- main widget
-        self.mainWidget = QFrame(self.cavs_phase_scan_cntrl.tabs)
+        self.mainWidget = QFrame()
        
         buttons_style = StyleSheetFactory.pushButtonStyleSheet()
         groupBox_style = StyleSheetFactory.groupBoxStyleSheet()

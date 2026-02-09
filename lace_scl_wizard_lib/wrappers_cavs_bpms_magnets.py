@@ -50,7 +50,7 @@ class Cavity_Wrapper:
         self.sin_phase_func_amp = 0.
         self.sin_phase_func_amp_err = 0.
         #---- accelerating phase of the cavity: self.epicsPhase shift from cav. phase for min phase of BPMs
-        self.synch_acc_phase = 0.
+        self.synch_acc_phase = -15.
         #---- This is a phase shift between EPICS and model phases
         self.model_phase_shift = 0.
         #---- kinetic energies in MeV
@@ -93,7 +93,7 @@ class Cavity_Wrapper:
         self.sin_phase_func_amp = 0.
         self.sin_phase_func_amp_err = 0.
         #---- accelerating phase of the cavity: self.epicsPhase shift from cav. phase for min phase of BPMs
-        self.synch_acc_phase = 0.
+        self.synch_acc_phase = -15.
         #---- This is a phase shift between EPICS and model phases
         self.model_phase_shift = 0.      
         
