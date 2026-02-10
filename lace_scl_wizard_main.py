@@ -43,7 +43,7 @@ class LACE_SCL_Wizard:
         self.mainWindow = LACE_SCL_Wizard_MainWindow(self)
         self.mainWindow.setWindowTitle("LACE SCL Wizard")
         self.mainWindow.resize(1400, 600)
-        self.statusBar = self.mainWindow.getStatusBar()
+        self.statusLabel = self.mainWindow.getStatusLabel()
         
         self.tabs = QTabWidget()
         self.tabs.setTabPosition(QTabWidget.TabPosition.North)
@@ -98,8 +98,8 @@ class LACE_SCL_Wizard:
                 return self.tabs.widget(ind)
         return widget
         
-    def getStatusBar(self):
-        return self.mainWindow.getStatusBar()     
+    def getStatusLabel(self):
+        return self.mainWindow.getStatusLabel()     
         
     def stopAllThreads(self):
         for controller in self.controllers_arr:
@@ -148,7 +148,7 @@ class LACE_SCL_Wizard_MainWindow(QMainWindow):
         self.lace_scl_wizard = lace_scl_wizard
         self._createActions()
         self._createMenuBar()
-        self._createStatusBar()
+        self._createStatusLabel()
         
     def _createMenuBar(self):       
         menuBar = QMenuBar(self)
@@ -172,13 +172,15 @@ class LACE_SCL_Wizard_MainWindow(QMainWindow):
         self.saveScanAction.triggered.connect(self.lace_scl_wizard.dumpWizardData)
         self.saveAsScanAction.triggered.connect(self.lace_scl_wizard.dumpWizardDataAs)
         
-    def _createStatusBar(self):
+    def _createStatusLabel(self):
         self.statusbar = self.statusBar()
-        self.statusbar.showMessage("LACE SCL Wizard is Ready")
-        #self.statusbar.clearMessage()
+        self.statusbar.insertPermanentWidget(0,QLabel("Status:"),stretch=0)
+        self.status_label = QLabel("LACE SCL Wizard is Ready")
+        self.status_label.setStyleSheet("color: red;")
+        self.statusbar.insertPermanentWidget(1,self.status_label,stretch=1)
         
-    def getStatusBar(self):
-        return self.statusbar
+    def getStatusLabel(self):
+        return self.status_label
 
 if __name__ == '__main__':
     
