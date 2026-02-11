@@ -33,6 +33,7 @@ from orbit.core.orbit_utils import Function
 from lace_om_lib.scl_online_model_lib import SCL_Online_Model
 from lace_scl_wizard_lib.cntrl_lib_init_state import InitState_Cntrl
 from lace_scl_wizard_lib.cntrl_lib_scl_phase_scan import CavsPhaseScan_Cntrl
+from lace_scl_wizard_lib.energy_meter_lib import EnergyMeter
 
 class LACE_SCL_Wizard:
     """
@@ -72,6 +73,9 @@ class LACE_SCL_Wizard:
         self.cavs_phase_scan_cntrl = CavsPhaseScan_Cntrl(self)
         self.controllers_arr.append(self.cavs_phase_scan_cntrl)
         self.tabs.addTab(self.cavs_phase_scan_cntrl.getMainWidget(),self.cavs_phase_scan_cntrl.getTabName())
+
+        #----- energy meter 
+        self.energy_meter = EnergyMeter(self)
 
         self.mainWindow.setCentralWidget(self.tabs) 
         #-------------------------------------------------------

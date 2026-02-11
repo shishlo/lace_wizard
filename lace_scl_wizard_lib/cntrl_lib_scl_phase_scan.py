@@ -379,6 +379,8 @@ class UpperScanPanelCntrl:
         self.wrap_phase_button.setChecked(True)
         self.keep_phases_button = QRadioButton("Keep Cavs Phases")
         self.keep_phases_button.setChecked(False)
+        self.eKin_measure_button = QRadioButton("Measure eKin")
+        self.eKin_measure_button.setChecked(False)   
 
         hor_layout_1.addWidget(setSynchPhase_button)
         hor_layout_1.addWidget(self.sync_phase_double_spin_box)
@@ -391,6 +393,7 @@ class UpperScanPanelCntrl:
         hor_layout_1.addWidget(QLabel("   "))
         hor_layout_1.addWidget(self.wrap_phase_button)
         hor_layout_1.addWidget(self.keep_phases_button)
+        hor_layout_1.addWidget(self.eKin_measure_button)
 
         #----------------------------------------------
         #---- lower line - hor_view_2 panel

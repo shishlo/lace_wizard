@@ -29,8 +29,8 @@ def get_SCL_EmptyBunch(eKin):
 	bunch = Bunch()
 	syncPart = bunch.getSyncParticle()
 	# set H- mass
-	# self.bunch.mass(0.9382723 + 2*0.000511)
-	bunch.mass(0.939294)
+	# self.bunch.mass(938.272089 + 2*0.511)
+	bunch.mass(938.272089 + 2*0.511)
 	bunch.charge(-1.0)
 	syncPart.kinEnergy(eKin)
 	return bunch 

@@ -10,6 +10,8 @@ import epics
 
 from PySide6.QtCore import QRunnable, QThreadPool, QTimer, Slot
 
+from .energy_meter_lib import EnergyMeter
+
 #------------------------------------------------------------------------
 #           Auxiliary SCAN classes and functions
 #------------------------------------------------------------------------   
@@ -49,14 +51,18 @@ class PhaseScan_Runner(QRunnable):
         self.cavs_data_table_model = self.cavs_scan_cntrl.cavs_data_table_model
         #--------------------------------------
         self.scan_wait_time_spin_box = self.cavs_scan_cntrl.upper_panel_cntrl.scan_wait_time_spin_box
+        self.phase_scan_step_spin_box = self.cavs_scan_cntrl.upper_panel_cntrl.phase_scan_step_spin_box
         self.max_sin_amp_err_spin_box = self.cavs_scan_cntrl.upper_panel_cntrl.max_sin_amp_err_spin_box
         self.bpm_min_amp_spin_box = self.cavs_scan_cntrl.bottom_panel_cntrl.bpm_min_amp_spin_box
         self.stat_for_in_enrg_spin_box = self.cavs_scan_cntrl.upper_panel_cntrl.stat_for_in_enrg_spin_box
         self.wrap_phase_button = self.cavs_scan_cntrl.upper_panel_cntrl.wrap_phase_button
         self.keep_phases_button = self.cavs_scan_cntrl.upper_panel_cntrl.keep_phases_button
+        self.eKin_measure_button = self.cavs_scan_cntrl.upper_panel_cntrl.eKin_measure_button
         #---------------------------------------
         self.scan_stopper = self.cavs_scan_cntrl.scan_stopper
+        self.scan_status_text = self.cavs_scan_cntrl.upper_panel_cntrl.scan_status_text
         self.statusLabel = self.lace_scl_wizard.getStatusLabel()
+        #self.statusLabel.setStyleSheet("color: red;")
         
     def blankCavities(self,cav_ind_start):
         cav_wrappers = self.cavs_data_table_model.cav_wrappers
@@ -70,39 +76,46 @@ class PhaseScan_Runner(QRunnable):
     @Slot()
     def run(self):
         """ Phase scan thread execution."""
+        cav_start = self.cav_wrappers[0].getAlias()
+        cav_stop = self.cav_wrappers[-1].getAlias()
+        self.scan_status_text.setText("Phase scan started with cvity = " + cav_start + " to " + cav_stop)
         self.cavs_table_view.clearSelection()
+        phase_step = self.phase_scan_step_spin_box.value()
         sleep_time = self.scan_wait_time_spin_box.value()
+        n_pulses = int(self.stat_for_in_enrg_spin_box.value())
+        min_bpm_amp = self.bpm_min_amp_spin_box.value()
         iter_count = 0
         time_start = time.time()
         for cav_wrapper in self.cav_wrappers:
+            cav_start = cav_wrapper.getAlias()
+            scav_stop = self.cav_wrappers[-1].getAlias()
+            self.scan_status_text.setText("Phase scan cavities from = " + cav_start + " to " + cav_stop)
             #---- cav index in the table
             cav_ind = self.cavs_data_table_model.cav_wrappers.index(cav_wrapper)
             self.cavs_table_view.clearSelection()
             if(cav_wrapper.isGood == False): continue
             self.cavs_table_view.selectRow(cav_ind)
             #---- collect statistics for energy measurents
-            self.blankCavities(cav_ind)
-            n_energy_iters = int(self.stat_for_in_enrg_spin_box.value())
-            for it_ind in range(n_energy_iters):
-                pass   
+            if(self.eKin_measure_button.isChecked()):
+                self.blankCavities(cav_ind)
+                eKin_guess = cav_wrapper.eKin_guess
+                energy_meter = self.lace_scl_wizard.getEneryMeter()
+                (eKin, eKin_err, *rest) = energy_meter.measureEnergy(cav_wrapper,eKin_guess,n_pulses,1.1,min_bpm_amp)
+                if(self.scan_stopper.getShouldStop() or abs(eKin) < 0.1 ):
+                    self.scan_status_text.setText("Phase scan stopped with error.")
+                    self.scan_stopper.setShouldStop(False)
+                    self.scan_stopper.setIsRunning(False)
+                    return
+                cav_wrapper.eKin_guess = eKin
+                self.blankCavities(cav_ind + 1)
             #---- scan process
             cav_phase = -180.
-            while( cav_phase <= 180.):
-                pass
+            while(cav_phase <= 180.):
+                if(self.scan_stopper.getShouldStop()):
+                    self.scan_stopper.setShouldStop(False)
+                    self.scan_stopper.setIsRunning(False)
+                    return
+                time.sleep(sleep_time)
+                print ("debug phase =",cav_phase)
+                cav_phase += phase_step
             time.sleep(1.0)
-            
-        
-        
-        count = 0
-        while(1 < 2):
-            print ("debug start scan")
-            self.statusLabel.setText("Wizard is running. Count="+str(count))
-            time.sleep(1.0)
-            if(count % 2 == 0):
-                self.statusLabel.setStyleSheet("color: red;")
-            else:
-                self.statusLabel.setStyleSheet("color: black;")
-            count += 1
-            if(self.scan_stopper.getShouldStop()):
-                break
-        self.scan_stopper.setShouldStop(False)
