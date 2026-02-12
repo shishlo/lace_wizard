@@ -169,6 +169,33 @@ class Cavs_Scan_Cntrl:
         """ Reads data for this controller from the Data Adaptor """
         return
 
+    def plotPhaseScan(self):
+        """
+        plot_phase_scan
+
+        plot_energy = PlotWidget()
+
+        plot_energy.showGrid(True, True)
+        legend = plot_energy.addLegend(labelTextSize='12pt', labelTextColor="white")
+        legend.anchor((0, 0), (0, 0))
+        plot_energy.setTitle("Energy scan")
+        plot_energy.setLabel('bottom', html.unescape("&phi;"), units='deg')
+        plot_energy.setLabel('left', html.unescape("T<sub>out</sub>"), units='eV')
+        plot_energy.getAxis('left').setTextPen('white')
+        plot_energy.getAxis('bottom').setTextPen('white')
+
+        self.energy_data = plot_energy.plot(pen='white', linestyle="-", symbol="o", symbolBrush='r',marker_size=5, name=html.unescape("T<sub>out</sub>  meas."))
+        self.energy_data_fit = plot_energy.plot( pen=mkPen(color='cyan', width=2),linestyle="-",  name=html.unescape("T<sub>out</sub>  fit"))
+
+
+        self.vertical_line_phi = InfiniteLine(angle=90, pen=mkPen(color='white', width=1, style=Qt.DashLine),movable=False)
+        self.vertical_line_phi.label = InfLineLabel(self.vertical_line_phi, text=html.unescape("&phi;0"), position=0.97,color='white')  # Position at the top (0.95)
+        #self.vertical_line_phi.label = InfLineLabel(self.vertical_line_phi, text="LACE IP", position=0.97,color='white')  # Position at the top (0.95)
+        #vertical_line_phi.setPos(0.0)
+        plot_energy.addItem(self.vertical_line_phi)
+        """
+
+
     def stopAllThreads(self):
         """ Stops all threads of this controller """
         #self.scanStopper.setSetToStop(True)
@@ -264,6 +291,10 @@ class StartScan_Action:
         
     def performActionForSelected(self):
         self.cavs_scan_cntrl = self.upper_panel_cntrl.cavs_scan_cntrl
+        #---- We cannot start a second scan -------
+        scan_stopper = self.cavs_scan_cntrl.scan_stopper
+        if(scan_stopper.getIsRunning()): return
+        #------------------------------------------
         cav_selection_model = self.cavs_scan_cntrl.cavs_table_view.selectionModel()
         cav_wrappers = self.cavs_scan_cntrl.cav_wrappers
         cav_name_column_ind = 0
@@ -282,6 +313,10 @@ class StartScan_Action:
         
     def performAction(self):
         self.cavs_scan_cntrl = self.upper_panel_cntrl.cavs_scan_cntrl
+        #---- We cannot start a second scan -------
+        scan_stopper = self.cavs_scan_cntrl.scan_stopper
+        if(scan_stopper.getIsRunning()): return
+        #------------------------------------------
         cav_wrappers = self.cavs_scan_cntrl.cav_wrappers
         self._performAction(cav_wrappers)
         print ("debug Starts the phase scans for all cavities. ")
@@ -400,7 +435,7 @@ class UpperScanPanelCntrl:
         #----------------------------------------------
         phase_scan_step_label = QLabel("Phase Step[deg]=")
         self.phase_scan_step_spin_box = QDoubleSpinBox()
-        self.phase_scan_step_spin_box.setRange(0.,30.)    # Set min/max range
+        self.phase_scan_step_spin_box.setRange(0.,180.)    # Set min/max range
         self.phase_scan_step_spin_box.setDecimals(0)      # Set precision to 2 decimal places
         self.phase_scan_step_spin_box.setSingleStep(1)    # Set step size for arrow buttons
         self.phase_scan_step_spin_box.setValue(20.0)      # Set default value

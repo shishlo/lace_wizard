@@ -2,8 +2,9 @@
 # This is a library of phase scan classes that performing scan process,
 # collecting bpm data, filtering them, and stop scans if necessary. 
 #---------------------------------------------------------------------------
-
 import time
+
+from orbit.core.orbit_utils import Function
 
 #---- Channel access
 import epics
@@ -70,9 +71,31 @@ class PhaseScan_Runner(QRunnable):
             if(cav_wrapper.isGood == False): continue
             blanking = False
             if(cav_ind >= cav_ind_start): blanking = True
-            cav_wrapper.setCavityEPICS_Blanking(blanking)
+            #cav_wrapper.setCavityEPICS_Blanking(blanking)
             #cav_wrapper.cav_model.setCavityModelBlanking(blanking)
             
+    def initAmpPhaseFunction(self,cav_wrapper):
+        cav_wrapper.bpm_amp_phase_dict = {}
+        for bpm_wrapper in cav_wrapper.bpm_wrappers:
+            cav_wrapper.bpm_amp_phase_dict[bpm_wrapper.getAlias()] = (Function(),Function())
+            if(not bpm_wrapper.connectPVs()): bpm_wrapper.isGood = False
+
+    def measureBPMsVsCavPhase(self,cav_wrapper,cav_phase):
+        bpm_amp_phase_dict = cav_wrapper.bpm_amp_phase_dict
+        bpm_wrappers = []
+        for bpm_wrapper in cav_wrapper.bpm_wrappers:
+            if(bpm_wrapper.isGood): bpm_wrappers.append(bpm_wrapper)
+        bpm_amp_pvs = [bpm_wrapper.getAmpPV() for bpm_wrapper in bpm_wrappers]
+        bpm_phase_pvs = [bpm_wrapper.getPhasePV() for bpm_wrapper in bpm_wrappers]
+        amp_vals = [bpm_amp_pv.get() for bpm_amp_pv in bpm_amp_pvs]
+        phase_vals = [bpm_phase_pv.get() for bpm_phase_pv in bpm_phase_pvs]
+        for bpm_ind,bpm_wrapper in enumerate(bpm_wrappers):
+            amp = amp_vals[bpm_ind]
+            phase = phase_vals[bpm_ind]
+            (amp_func,phase_func) = cav_wrapper.bpm_amp_phase_dict[bpm_wrapper.getAlias()]
+            amp_func.add(cav_phase,amp)
+            phase_func.add(cav_phase,phase)
+   
     @Slot()
     def run(self):
         """ Phase scan thread execution."""
@@ -82,10 +105,13 @@ class PhaseScan_Runner(QRunnable):
         self.cavs_table_view.clearSelection()
         phase_step = self.phase_scan_step_spin_box.value()
         sleep_time = self.scan_wait_time_spin_box.value()
+        bpm_sleep_time = 1.1
         n_pulses = int(self.stat_for_in_enrg_spin_box.value())
         min_bpm_amp = self.bpm_min_amp_spin_box.value()
         iter_count = 0
         time_start = time.time()
+        for cav_wrapper in self.cav_wrappers:
+            print ("debug init cav=",cav_wrapper.getAlias()," state=",cav_wrapper.isGood)        
         for cav_wrapper in self.cav_wrappers:
             cav_start = cav_wrapper.getAlias()
             scav_stop = self.cav_wrappers[-1].getAlias()
@@ -100,22 +126,41 @@ class PhaseScan_Runner(QRunnable):
                 self.blankCavities(cav_ind)
                 eKin_guess = cav_wrapper.eKin_guess
                 energy_meter = self.lace_scl_wizard.getEneryMeter()
-                (eKin, eKin_err, *rest) = energy_meter.measureEnergy(cav_wrapper,eKin_guess,n_pulses,1.1,min_bpm_amp)
+                (eKin, eKin_err, bpm_wrappers, amp_pos_func, phase_pos_func, *rest) = energy_meter.measureEnergy(cav_wrapper,eKin_guess,n_pulses,bpm_sleep_time,min_bpm_amp)
                 if(self.scan_stopper.getShouldStop() or abs(eKin) < 0.1 ):
-                    self.scan_status_text.setText("Phase scan stopped with error.")
+                    if(self.scan_stopper.getShouldStop()): self.scan_status_text.setText("Phase scan stopped by user request.")
+                    if(abs(eKin) < 0.1): self.scan_status_text.setText("Phase scan stopped with error. Cav="+cav_start)
                     self.scan_stopper.setShouldStop(False)
                     self.scan_stopper.setIsRunning(False)
                     return
                 cav_wrapper.eKin_guess = eKin
+                cav_wrapper.eKin_guess_err = eKin_err
+                cav_wrapper.bpm_amp_phase_in_funcions = (amp_pos_func, phase_pos_func)
                 self.blankCavities(cav_ind + 1)
             #---- scan process
+            self.initAmpPhaseFunction(cav_wrapper)
+            cav_phase_init = cav_wrapper.getEPICS_CavityPhase()
             cav_phase = -180.
             while(cav_phase <= 180.):
                 if(self.scan_stopper.getShouldStop()):
                     self.scan_stopper.setShouldStop(False)
                     self.scan_stopper.setIsRunning(False)
+                    #cav_wrapper.setEPICS_CavityPhase(cav_phase_init)
                     return
+                #cav_wrapper.setEPICS_CavityPhase(cav_phase)
                 time.sleep(sleep_time)
+                self.measureBPMsVsCavPhase(cav_wrapper,cav_phase)
                 print ("debug phase =",cav_phase)
                 cav_phase += phase_step
-            time.sleep(1.0)
+            #cav_wrapper.setEPICS_CavityPhase(cav_phase_init)
+            cav_wrapper.isMeasured = True
+        #--------- END of SCAN
+        self.cavs_scan_cntrl.cavs_data_table_model.tableChanged()
+        for cav_wrapper in self.cav_wrappers:
+            print ("debug cav=",cav_wrapper.getAlias()," state=",cav_wrapper.isGood)
+        time_scan = time.time() - time_start
+        self.scan_status_text.setText("Phase scan finished. Time[sec] = "+"%7.1f"%time_scan)
+        self.scan_stopper.setShouldStop(False)
+        self.scan_stopper.setIsRunning(False)
+        return
+           

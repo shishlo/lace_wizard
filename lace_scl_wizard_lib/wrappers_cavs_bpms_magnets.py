@@ -1,5 +1,7 @@
 import time
 
+from orbit.core.orbit_utils import Function
+
 #---- Channel access
 import epics
 
@@ -16,12 +18,13 @@ class Cavity_Wrapper:
         self.isMeasured = False
         self.isAnalyzed = False
         #---- bpm_amp_phase_dict and bpm_xy_dict dictionary with Function instances data
-        #---- self.bpm_amp_phase_dic[BPM_Wrapper.getName()] = (FunctionAmp,FunctionPhase)
+        #---- Functions are values amplutudes of phases vs cavity phase
+        #---- self.bpm_amp_phase_dic[BPM_Wrapper.getAlias()] = (FunctionAmp,FunctionPhase)
         self.bpm_amp_phase_dict = {}
-        #---- bpm_amp_phase_in_stat_dict - statistics of BPMs phases and amplitudes 
+        #---- bpm_amp_phase_in_functions - BPMs phases and amplitudes vs. BPM's position
         #---- at the entrance of the cavity to calculate the entrance energy
-        #---- self.bpm_amp_phase_in_stat_dict[BPM_Wrapper.getName()] = (FunctionAmp,FunctionPhase)
-        self.bpm_amp_phase_in_stat_dict = {}
+        #----- bpm_amp_phase_in_funcions = (FunctionAmp(),FunctionPhase())
+        self.bpm_amp_phase_in_funcions = (Function(),Function())
         #---------------------------------------------------------------------
         self.bpm_wrappers = bpm_wrappers
         #--- use or not in phase scan analysis: self.bpm_wrappers_useInPhaseAnalysis[bpm_wrapper,]
@@ -57,6 +60,7 @@ class Cavity_Wrapper:
         self.eKin_in = 185.6
         self.eKin_out = 185.6
         self.eKin_guess = 185.6
+        self.eKin_guess_err = 0.
         #---- EPICS connections, PV channels
         self.is_connected = False
         pv_name_start = ""
@@ -157,6 +161,9 @@ class BPM_Wrapper:
         self.bpm_amp_pv = epics.PV(pv_name_start + "amplitudeAvg")
         self.bpm_phase_pv = epics.PV(pv_name_start + "phaseAvg")
         self.bpm_oeda_pv = epics.PV(pv_name_start + "OEDA")
+        
+    def getAlias(self):
+        return self.alias
         
     def getPosition(self):
         return self.model_bpm.getPosition()

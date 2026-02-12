@@ -29,12 +29,14 @@ class EnergyMeter:
         n_pulses -  measurement statistics
         sleep_time - sleep time before measurements
         min_bpm_amp - minimal BPM amplitude signal which we will use
+        If it returns eKin,eKin_err = 0. the scan was unsuccessful 
         """
         scan_stopper = self.lace_scl_wizard.cavs_phase_scan_cntrl.cavs_scan_cntrl
         bpm_amp_phase_err_dict = {}
         eKin = 0.
         eKin_err = 0.
         phase_pos_func = Function()
+        amp_pos_func = Function()
         poly_fit = PolynomialFit(1)
         bpm_init_wrappers = self.lace_scl_wizard.getBPM_Wrappers()
         pos_min = cav_wrapper.getPosition()
@@ -45,17 +47,18 @@ class EnergyMeter:
         #-------------------------------------------
         bpm_amp_pvs = [bpm_wrapper.getAmpPV() for bpm_wrapper in bpm_wrappers]
         bpm_phase_pvs = [bpm_wrapper.getPhasePV() for bpm_wrapper in bpm_wrappers]
-        if(scan_stopper.getShouldStop()): return (eKin,eKin_err,phase_pos_func,poly_func,bpm_wrappers,bpm_amp_phase_err_dict)
+        if(scan_stopper.getShouldStop()): return (eKin,eKin_err,bpm_wrappers,amp_pos_func,phase_pos_func,poly_func,bpm_wrappers,bpm_amp_phase_err_dict)
         time.sleep(sleep_time)
-        if(scan_stopper.getShouldStop()): return (eKin,eKin_err,phase_pos_func,poly_func,bpm_wrappers,bpm_amp_phase_err_dict)
+        if(scan_stopper.getShouldStop()): return (eKin,eKin_err,bpm_wrappers,amp_pos_func,phase_pos_func,poly_func,bpm_wrappers,bpm_amp_phase_err_dict)
         res_arr = []
         for ind in range(n_pulses):
             amp_vals = [bpm_amp_pv.get() for bpm_amp_pv in bpm_amp_pvs]
             phase_vals = [bpm_phase_pv.get() for bpm_phase_pv in bpm_phase_pvs]
             res_arr.append([amp_vals,phase_vals])
-            if(scan_stopper.getShouldStop()): return (eKin,bpm_wrappers)
+            if(scan_stopper.getShouldStop()): return (eKin,eKin_err,bpm_wrappers,amp_pos_func,phase_pos_func,poly_func,bpm_wrappers,bpm_amp_phase_err_dict)
             time.sleep(sleep_time)
-            if(scan_stopper.getShouldStop()): return (eKin,bpm_wrappers)
+            if(scan_stopper.getShouldStop()): return (eKin,eKin_err,bpm_wrappers,amp_pos_func,phase_pos_func,poly_func,bpm_wrappers,bpm_amp_phase_err_dict)
+        #---- Here we will collect amplitudes of BPMs vs. their position 
         for bpm_ind,bpm_wrapper in enumerate(bpm_wrappers):
             amp_arr = []
             phase_arr = []
@@ -65,6 +68,7 @@ class EnergyMeter:
                 phase_arr.append(phase_vals[bpm_ind])
             (amp_avg,amp_err) = calculateAvgErr(amp_arr)
             (phase_avg,phase_arr) = calculateAvgErr(phase_arr)
+            amp_pos_func.add(bpm_wrapper.getPosition(),amp_avg,amp_err)
             if(amp_avg < min_bpm_amp): continue
             bpm_amp_phase_err_dict[bpm_wrapper.getName()] = ((amp_avg,amp_err),(phase_avg,phase_err))
         #-------------------------------------------
@@ -136,6 +140,6 @@ class EnergyMeter:
         beta_err = coeff_err*coeff_init/coeff**2
         eKin_err = mass*beta*beta_err*(gamma)**3
         #---- polynomial
-        return (eKin,eKin_err,phase_pos_func,poly_func,bpm_wrappers,bpm_amp_phase_err_dict)
+        return (eKin,eKin_err,bpm_wrappers,amp_pos_func,phase_pos_func,poly_func,bpm_wrappers,bpm_amp_phase_err_dict)
     
         
