@@ -131,6 +131,9 @@ class Cavs_Scan_Cntrl:
         main_layout.addWidget(central_view,1)
         main_layout.addWidget(self.bottom_panel_cntrl.getMainWidget(),1)
         
+        #---- set up plots
+        (self.bpm_phase_diff_plot,self.bpm_phase_diff_data) = self.getPlotAndDataPhaseScan()
+        
         self.getMainWidget().setLayout(main_layout)
         
         #---- Scan state controller aka Scan Stopper
@@ -160,6 +163,10 @@ class Cavs_Scan_Cntrl:
         cav_wrapper = self.cav_wrappers[row]
         self.bpms_tab_panel.setTabText(0,cav_wrapper.getAlias())
         self.bpms_use_table_model.setCavWrapper(cav_wrapper)
+        #---- plot the graph of phase difference for bpm 0 and 1
+        self.bpm_phase_diff_plot.setTitle("Phase Scan" + " Cvaity " + cav_wrapper.getAlias())
+        (x_arr,y_arr,y_err_arr) = cav_wrapper.phaseDiffBPM01_func.getXYErrLists()
+        self.bpm_phase_diff_data.setData(x_arr,y_arr)        
 
     def dumpCntrlDataToDA(self,parent_da):
         """ Puts this controller data into the Data Adaptor """
@@ -169,32 +176,20 @@ class Cavs_Scan_Cntrl:
         """ Reads data for this controller from the Data Adaptor """
         return
 
-    def plotPhaseScan(self):
-        """
-        plot_phase_scan
-
-        plot_energy = PlotWidget()
-
-        plot_energy.showGrid(True, True)
-        legend = plot_energy.addLegend(labelTextSize='12pt', labelTextColor="white")
+    def getPlotAndDataPhaseScan(self):
+        bpm_phase_diff_plot = self.bottom_panel_cntrl.bpm_phase_diff_plot
+        bpm_phase_diff_plot.showGrid(True, True)
+        legend = bpm_phase_diff_plot.addLegend(labelTextSize='12pt', labelTextColor="white")
         legend.anchor((0, 0), (0, 0))
-        plot_energy.setTitle("Energy scan")
-        plot_energy.setLabel('bottom', html.unescape("&phi;"), units='deg')
-        plot_energy.setLabel('left', html.unescape("T<sub>out</sub>"), units='eV')
-        plot_energy.getAxis('left').setTextPen('white')
-        plot_energy.getAxis('bottom').setTextPen('white')
-
-        self.energy_data = plot_energy.plot(pen='white', linestyle="-", symbol="o", symbolBrush='r',marker_size=5, name=html.unescape("T<sub>out</sub>  meas."))
-        self.energy_data_fit = plot_energy.plot( pen=mkPen(color='cyan', width=2),linestyle="-",  name=html.unescape("T<sub>out</sub>  fit"))
-
-
-        self.vertical_line_phi = InfiniteLine(angle=90, pen=mkPen(color='white', width=1, style=Qt.DashLine),movable=False)
-        self.vertical_line_phi.label = InfLineLabel(self.vertical_line_phi, text=html.unescape("&phi;0"), position=0.97,color='white')  # Position at the top (0.95)
-        #self.vertical_line_phi.label = InfLineLabel(self.vertical_line_phi, text="LACE IP", position=0.97,color='white')  # Position at the top (0.95)
-        #vertical_line_phi.setPos(0.0)
-        plot_energy.addItem(self.vertical_line_phi)
-        """
-
+        bpm_phase_diff_plot.setTitle("Phase Scan")
+        bpm_phase_diff_plot.setLabel('bottom', html.unescape("Cavity EPICS &phi;"), units='deg')
+        bpm_phase_diff_plot.setLabel('left', html.unescape("&Delta; &phi;<sub>12</sub>"), units='deg')
+        bpm_phase_diff_plot.getAxis('left').setTextPen('white')
+        bpm_phase_diff_plot.getAxis('bottom').setTextPen('white')
+        
+        bpm_phase_diff_data = bpm_phase_diff_plot.plot(pen='white', linestyle="-", symbol="o", symbolBrush='r',marker_size=5, name=html.unescape("&Delta; &phi;<sub>12</sub>"))
+        
+        return (bpm_phase_diff_plot,bpm_phase_diff_data)
 
     def stopAllThreads(self):
         """ Stops all threads of this controller """

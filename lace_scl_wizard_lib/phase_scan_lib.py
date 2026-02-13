@@ -3,8 +3,11 @@
 # collecting bpm data, filtering them, and stop scans if necessary. 
 #---------------------------------------------------------------------------
 import time
+import math
 
 from orbit.core.orbit_utils import Function
+# import the utilities
+from orbit.utils import phaseNearTargetPhase, phaseNearTargetPhaseDeg
 
 #---- Channel access
 import epics
@@ -89,13 +92,22 @@ class PhaseScan_Runner(QRunnable):
         bpm_phase_pvs = [bpm_wrapper.getPhasePV() for bpm_wrapper in bpm_wrappers]
         amp_vals = [bpm_amp_pv.get() for bpm_amp_pv in bpm_amp_pvs]
         phase_vals = [bpm_phase_pv.get() for bpm_phase_pv in bpm_phase_pvs]
+        bpm_phase0 = 0.
+        bpm_phase1 = 0.
         for bpm_ind,bpm_wrapper in enumerate(bpm_wrappers):
             amp = amp_vals[bpm_ind]
             phase = phase_vals[bpm_ind]
             (amp_func,phase_func) = cav_wrapper.bpm_amp_phase_dict[bpm_wrapper.getAlias()]
             amp_func.add(cav_phase,amp)
             phase_func.add(cav_phase,phase)
-   
+            if(cav_wrapper.bpm_wrapper0 == bpm_wrapper): bpm_phase0 = phase
+            if(cav_wrapper.bpm_wrapper1 == bpm_wrapper): bpm_phase1 = phase
+            #print ("debug bpm=",bpm_wrapper.getAlias()," phase=",phase)
+        #---------------------------------------
+        phase_diff = phaseNearTargetPhaseDeg(bpm_phase1,bpm_phase0) - bpm_phase0
+        phase_diff += 300.0*math.sin(cav_phase*math.pi/180.)
+        cav_wrapper.phaseDiffBPM01_func.add(cav_phase,phase_diff)
+             
     @Slot()
     def run(self):
         """ Phase scan thread execution."""
@@ -113,6 +125,7 @@ class PhaseScan_Runner(QRunnable):
         for cav_wrapper in self.cav_wrappers:
             print ("debug init cav=",cav_wrapper.getAlias()," state=",cav_wrapper.isGood)        
         for cav_wrapper in self.cav_wrappers:
+            cav_wrapper.phaseDiffBPM01_func.clean()
             cav_start = cav_wrapper.getAlias()
             scav_stop = self.cav_wrappers[-1].getAlias()
             self.scan_status_text.setText("Phase scan cavities from = " + cav_start + " to " + cav_stop)
@@ -151,6 +164,8 @@ class PhaseScan_Runner(QRunnable):
                 time.sleep(sleep_time)
                 self.measureBPMsVsCavPhase(cav_wrapper,cav_phase)
                 print ("debug phase =",cav_phase)
+                (x_arr,y_arr,y_err_arr) = cav_wrapper.phaseDiffBPM01_func.getXYErrLists()
+                self.cavs_scan_cntrl.bpm_phase_diff_data.setData(x_arr,y_arr)
                 cav_phase += phase_step
             #cav_wrapper.setEPICS_CavityPhase(cav_phase_init)
             cav_wrapper.isMeasured = True
