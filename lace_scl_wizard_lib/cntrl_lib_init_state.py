@@ -4,6 +4,9 @@ Controller for initialization of the SCL (CCL+HEBT also) linac from EPICS
 import sys
 import time
 import html
+import math
+
+from PySide6 import QtWidgets 
 
 from PySide6.QtWidgets import (
     QFrame,
@@ -335,9 +338,18 @@ class InitCavs_Action:
             time.sleep(0.5)
         for cav_wrapper in bad_cavs:
             cav_wrapper.isGood = False
-            cav_wrapper.cleanAllScanData()
+            cav_wrapper.cleanAllScanData() 
         for bpm_wrapper in bad_bpms:
             bpm_wrapper.isGood = False
+        #---- check real connection to EPICS
+        bpm_amp_pvs = [bpm_wrapper.getAmpPV() for bpm_wrapper in bpm_wrappers]
+        bpm_phase_pvs = [bpm_wrapper.getPhasePV() for bpm_wrapper in bpm_wrappers]
+        amp_vals = [bpm_amp_pv.get() for bpm_amp_pv in bpm_amp_pvs]
+        phase_vals = [bpm_phase_pv.get() for bpm_phase_pv in bpm_phase_pvs]        
+        for bpm_ind,bpm_wrapper in enumerate(bpm_wrappers):
+            if(not bpm_wrapper.isGood): continue
+            if(math.isnan(amp_vals[bpm_ind]) or math.isnan(phase_vals[bpm_ind])):
+                bpm_wrapper.isGood = False
         self.cavs_data_table_model.tableChanged()
         self.bpms_data_table_model.tableChanged()
         print ("debug init all")        
@@ -565,6 +577,7 @@ class InitState_Cntrl:
         self.bpms_table_view = BPMsQTableView()
         self.bpms_data_table_model = BPMsDataTableModel(self)
         self.bpms_table_view.setModel(self.bpms_data_table_model)
+        self.bpms_table_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.bpms_table_view.horizontalHeader().setSectionResizeMode(0,QHeaderView.ResizeToContents)
         self.bpms_table_view.horizontalHeader().setSectionResizeMode(1,QHeaderView.ResizeToContents)
         self.bpms_table_view.horizontalHeader().setSectionResizeMode(2,QHeaderView.ResizeToContents)
@@ -573,6 +586,7 @@ class InitState_Cntrl:
         self.cavs_table_view = LACE_QTableView()
         self.cavs_data_table_model = CavsDataTableModel(self)
         self.cavs_table_view.setModel(self.cavs_data_table_model)
+        self.cavs_table_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         #self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         
@@ -668,6 +682,7 @@ class InitState_Cntrl:
         #---- Let's make self.bpms_state_cntrl tab window
         #---------------------------------------------------
         self.bpms_params_table_view = LACE_QTableView()
+        self.bpms_params_table_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.bpms_params_table_model = BPMsParamsTableModel(self)
         self.bpms_params_table_view.setModel(self.bpms_params_table_model)
         #self.bpms_params_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)

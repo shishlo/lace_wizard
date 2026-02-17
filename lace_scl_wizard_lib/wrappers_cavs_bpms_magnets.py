@@ -134,7 +134,7 @@ class Cavity_Wrapper:
     def getEPICS_CavityAmp(self):
         if(self.is_connected):
             return self.cav_amp_pv.get()
-        return self.epics_cav_amp
+        return self.epicsAmp
 
     def setEPICS_CavityPhase(self,epics_cav_phase):
         if(self.is_connected):
@@ -143,7 +143,7 @@ class Cavity_Wrapper:
     def getEPICS_CavityPhase(self):
         if(self.is_connected):
             return self.cav_phase_pv.get()
-        return self.epics_cav_phase
+        return self.epicsPhase
 
 class BPM_Wrapper:
     def __init__(self,model_bpm):

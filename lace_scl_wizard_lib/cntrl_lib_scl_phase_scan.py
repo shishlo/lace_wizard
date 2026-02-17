@@ -5,6 +5,8 @@ will have the calibrated Online Model for SCL.
 import sys
 import html
 
+from PySide6 import QtWidgets 
+
 from PySide6.QtWidgets import (
     QFrame,
     QTableWidget,
@@ -90,12 +92,14 @@ class Cavs_Scan_Cntrl:
         self.cavs_table_view.setModel(self.cavs_data_table_model)
         #self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.cavs_table_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.cavs_table_view.selectionModel().selectionChanged.connect(self.cavsSelectionChanged)
 
         #---- BPMs that will be used for analysis
         self.bpms_table_view = LACE_QTableView()
         self.bpms_use_table_model = BPMsForAnalysisTableModel(self)
         self.bpms_table_view.setModel(self.bpms_use_table_model)
+        self.bpms_table_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.bpms_table_view.horizontalHeader().setSectionResizeMode(0,QHeaderView.ResizeToContents)
         self.bpms_table_view.horizontalHeader().setSectionResizeMode(1,QHeaderView.ResizeMode.Stretch)
         self.bpms_table_view.horizontalHeader().setSectionResizeMode(2,QHeaderView.ResizeMode.Stretch)
@@ -154,6 +158,7 @@ class Cavs_Scan_Cntrl:
     def cavsSelectionChanged(self,selected,deselected):
         """ Updates right BPM table for particular cavity with selected index """
         #---- selected.indexes() and deselected.indexes() with index.row() and index.column()
+        print ("debug cavsSelectionChanged selected=",selected.indexes())
         if(len(selected.indexes()) <= 0):
             self.bpms_tab_panel.setTabText(0,"Cavity None")
             self.bpms_use_table_model.setCavWrapper(None)
@@ -166,7 +171,7 @@ class Cavs_Scan_Cntrl:
         #---- plot the graph of phase difference for bpm 0 and 1
         self.bpm_phase_diff_plot.setTitle("Phase Scan" + " Cvaity " + cav_wrapper.getAlias())
         (x_arr,y_arr,y_err_arr) = cav_wrapper.phaseDiffBPM01_func.getXYErrLists()
-        self.bpm_phase_diff_data.setData(x_arr,y_arr)        
+        self.bpm_phase_diff_data.setData(x_arr,y_arr)
 
     def dumpCntrlDataToDA(self,parent_da):
         """ Puts this controller data into the Data Adaptor """
@@ -177,6 +182,7 @@ class Cavs_Scan_Cntrl:
         return
 
     def getPlotAndDataPhaseScan(self):
+        """ Adds plot data to the PlotWidget instance """ 
         bpm_phase_diff_plot = self.bottom_panel_cntrl.bpm_phase_diff_plot
         bpm_phase_diff_plot.showGrid(True, True)
         legend = bpm_phase_diff_plot.addLegend(labelTextSize='12pt', labelTextColor="white")

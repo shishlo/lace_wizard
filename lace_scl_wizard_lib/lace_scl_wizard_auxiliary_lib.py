@@ -20,11 +20,6 @@ from orbit.utils.fitting import TrialPoint
 
 from orbit.utils.fitting import SimplexSearchAlgorithm
 
-def FunctionToArr(func):
-    """ Returns the Function instance data as two lists x_arr and y_arr """
-    (x_arr,y_arr,y_err_arr) = func.getXYErrLists()
-    return (x_arr,y_arr,y_err_arr)
-
 def normilizeToOneFunction(func):
     """ Returns the Function instance data normalized to 1.0 """
     y_max = abs(func.getMaxY())
