@@ -29,7 +29,7 @@ from PySide6.QtWidgets import (
 
 from PySide6.QtCore import (
     Qt,Slot,
-    QRunnable, QObject, QThreadPool, Slot,
+    QRunnable, QObject, QThreadPool, Slot, Signal,
     QAbstractTableModel,
     QSize
     )
@@ -58,7 +58,7 @@ from gui_lib.borderlayout import BorderLayout, Position
 from gui_lib.style_sheets_lib import StyleSheetFactory
 from gui_lib.table_view_model_lib import LACE_QTableView, LACE_DataTableModel
 from .wrappers_cavs_bpms_magnets import Cavity_Wrapper, BPM_Wrapper
-from .phase_scan_lib import ScanStateController, PhaseScan_Runner
+from .phase_scan_lib import ScanStateController, PhaseScan_Runner, ScanWorkerSignals 
 
 #----------------------------------------------------------
 # Custom QtWidgets
@@ -138,6 +138,9 @@ class Cavs_Scan_Cntrl:
         #---- set up plots
         (self.bpm_phase_diff_plot,self.bpm_phase_diff_data) = self.getPlotAndDataPhaseScan()
         
+        #---- Signals for table and plot update during the phasee scan thread execution
+        self.scan_worker_signals = ScanWorkerSignals()
+        
         self.getMainWidget().setLayout(main_layout)
         
         #---- Scan state controller aka Scan Stopper
@@ -196,6 +199,21 @@ class Cavs_Scan_Cntrl:
         bpm_phase_diff_data = bpm_phase_diff_plot.plot(pen='white', linestyle="-", symbol="o", symbolBrush='r',marker_size=5, name=html.unescape("&Delta; &phi;<sub>12</sub>"))
         
         return (bpm_phase_diff_plot,bpm_phase_diff_data)
+
+    @Slot(tuple)     
+    def scanDataUpdate(self,tuple_input):
+        """ Perfoms all actions on GUI """
+        (update_type,*rest) = tuple_input
+        #---- Type of message - Scan status update
+        if(update_type == "status_update"):
+            msg_txt = rest[0]
+            self.upper_panel_cntrl.scan_status_text.setText(msg_txt)
+            return
+        if(update_type == "update_phase_diff_plot"):
+            cav_wrapper = rest[0]
+            (x_arr,y_arr,y_err_arr) = cav_wrapper.phaseDiffBPM01_func.getXYErrLists()
+            self.bpm_phase_diff_data.setData(x_arr,y_arr)
+        return
 
     def stopAllThreads(self):
         """ Stops all threads of this controller """
@@ -286,7 +304,9 @@ class StartScan_Action:
         self.cavs_phase_scan_cntrl = self.upper_panel_cntrl.cavs_phase_scan_cntrl
         self.cavs_table_view = self.cavs_scan_cntrl.cavs_table_view
         self.cavs_scan_cntrl.cavs_table_view.selectionModel().clearSelection()
+        scan_worker_signals = self.cavs_scan_cntrl.scan_worker_signals
         phase_scan_runner = PhaseScan_Runner(self.cavs_scan_cntrl,cav_wrappers)
+        scan_worker_signals.scan_data_changed.connect(self.cavs_scan_cntrl.scanDataUpdate)
         self.cavs_scan_cntrl.threadpool.start(phase_scan_runner)
         print ("debug Starts the phase scans for all or selected cavities. ")
         

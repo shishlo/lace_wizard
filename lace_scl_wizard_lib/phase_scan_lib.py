@@ -12,7 +12,7 @@ from orbit.utils import phaseNearTargetPhase, phaseNearTargetPhaseDeg
 #---- Channel access
 import epics
 
-from PySide6.QtCore import QRunnable, QThreadPool, QTimer, Slot
+from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Slot, Signal
 
 from .energy_meter_lib import EnergyMeter
 
@@ -36,7 +36,11 @@ class ScanStateController:
         
     def setShouldStop(self,val):
         self.shouldStop = val
-        
+
+class ScanWorkerSignals(QObject):
+    """ Signals for updating tables, info-lines text, and plots """ 
+    scan_data_changed = Signal(tuple)  
+
 class PhaseScan_Runner(QRunnable):
     """ 
     It performs the phase scan selected or all cavities.
@@ -50,6 +54,7 @@ class PhaseScan_Runner(QRunnable):
         self.cav_wrappers = cav_wrappers        
         self.cavs_phase_scan_cntrl = self.cavs_scan_cntrl.cavs_phase_scan_cntrl
         self.lace_scl_wizard = self.cavs_phase_scan_cntrl.lace_scl_wizard
+        self.signals = self.cavs_scan_cntrl.scan_worker_signals
         #--------------------------------------
         self.cavs_table_view = self.cavs_scan_cntrl.cavs_table_view
         self.cavs_data_table_model = self.cavs_scan_cntrl.cavs_data_table_model
@@ -162,14 +167,15 @@ class PhaseScan_Runner(QRunnable):
             phase_func1.initFromLists(x_arr,y_arr,err_arr)   
         # recreate phase difference
         self.recalculatePhaseDiffData(cav_wrapper)
-        return True        
-              
+        return True
+            
     @Slot()
     def run(self):
         """ Phase scan thread execution."""
         cav_start = self.cav_wrappers[0].getAlias()
         cav_stop = self.cav_wrappers[-1].getAlias()
-        #####self.scan_status_text.setText("Phase scan started with cvity = " + cav_start + " to " + cav_stop)
+        msg_txt = "Phase scan started with cvity = " + cav_start + " to " + cav_stop
+        self.signals.scan_data_changed.emit(("status_update",msg_txt))
         ######self.cavs_table_view.clearSelection()
         phase_step = self.phase_scan_step_spin_box.value()
         sleep_time = self.scan_wait_time_spin_box.value()
@@ -182,7 +188,8 @@ class PhaseScan_Runner(QRunnable):
             cav_wrapper.phaseDiffBPM01_func.clean()
             cav_start = cav_wrapper.getAlias()
             scav_stop = self.cav_wrappers[-1].getAlias()
-            ####self.scan_status_text.setText("Phase scan cavities from = " + cav_start + " to " + cav_stop)
+            msg_txt = "Phase scan started with cvity = " + cav_start + " to " + cav_stop
+            self.signals.scan_data_changed.emit(("status_update",msg_txt))
             #---- cav index in the table
             cav_ind = self.cavs_data_table_model.cav_wrappers.index(cav_wrapper)
             #####self.cavs_table_view.clearSelection()
@@ -196,7 +203,9 @@ class PhaseScan_Runner(QRunnable):
                 (eKin, eKin_err, bpm_wrappers, amp_pos_func, phase_pos_func, *rest) = energy_meter.measureEnergy(cav_wrapper,eKin_guess,n_pulses,bpm_sleep_time,min_bpm_amp)
                 if(self.scan_stopper.getShouldStop() or abs(eKin) < 0.1 ):
                     if(self.scan_stopper.getShouldStop()): self.scan_status_text.setText("Phase scan stopped by user request.")
-                    if(abs(eKin) < 0.1): self.scan_status_text.setText("Phase scan stopped with error. Cav="+cav_start)
+                    if(abs(eKin) < 0.1):
+                         msg_txt = "Phase scan stopped with error. Cav="+cav_start
+                         self.signals.scan_data_changed.emit(("status_update",msg_txt))
                     self.scan_stopper.setShouldStop(False)
                     self.scan_stopper.setIsRunning(False)
                     return
@@ -218,18 +227,17 @@ class PhaseScan_Runner(QRunnable):
                 time.sleep(sleep_time)
                 self.measureBPMsVsCavPhase(cav_wrapper,cav_phase)
                 print ("debug phase =",cav_phase)
-                (x_arr,y_arr,y_err_arr) = cav_wrapper.phaseDiffBPM01_func.getXYErrLists()
-                self.cavs_scan_cntrl.bpm_phase_diff_data.setData(x_arr,y_arr)
+                self.signals.scan_data_changed.emit(("update_phase_diff_plot",cav_wrapper))
                 cav_phase += phase_step
             #cav_wrapper.setEPICS_CavityPhase(cav_phase_init)
             result = self.wrappAllPhasesForBPMs(cav_wrapper)
-            (x_arr,y_arr,y_err_arr) = cav_wrapper.phaseDiffBPM01_func.getXYErrLists()
-            self.cavs_scan_cntrl.bpm_phase_diff_data.setData(x_arr,y_arr)            
+            self.signals.scan_data_changed.emit(("update_phase_diff_plot",cav_wrapper))         
             cav_wrapper.isMeasured = True
             #####self.cavs_scan_cntrl.cavs_data_table_model.tableChanged()
         #--------- END of SCAN
         time_scan = time.time() - time_start
-        #####self.scan_status_text.setText("Phase scan finished. Time[sec] = "+"%7.1f"%time_scan)
+        msg_txt = "Phase scan finished. Time[sec] = "+"%7.1f"%time_scan
+        self.signals.scan_data_changed.emit(("status_update",msg_txt))        
         self.scan_stopper.setShouldStop(False)
         self.scan_stopper.setIsRunning(False)
         #---- clear selection 
