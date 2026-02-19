@@ -17,21 +17,24 @@ class Cavity_Wrapper:
         self.isGood = True
         self.isMeasured = False
         self.isAnalyzed = False
+        self.bpm_wrappers = bpm_wrappers       
         #---------------------------------------------------------------------
         #---- bpm_amp_phase_dict and bpm_xy_dict dictionary with Function instances data
         #---- Functions are values amplutudes of phases vs cavity phase
         #---- self.bpm_amp_phase_dic[BPM_Wrapper.getAlias()] = (FunctionAmp,FunctionPhase)
+        #---- FunctionAmp,FunctionPhase are functions of cavity phases during the scan
         self.bpm_amp_phase_dict = {}
+        for bpm_wrapper in self.bpm_wrappers:
+            self.bpm_amp_phase_dict[bpm_wrapper.getAlias()] = (Function(),Function())
         #---------------------------------------------------------------------
         #---- bpm_amp_phase_in_functions - BPMs phases and amplitudes vs. BPM's position
         #---- at the entrance of the cavity to calculate the entrance energy
-        #---- bpm_amp_phase_in_funcions = (FunctionAmp(),FunctionPhase())
-        self.bpm_amp_phase_in_funcions = (Function(),Function())
+        #---- bpm_amp_phase_entrance_funcions = (FunctionAmp(vs. BPM position),FunctionPhase(vs. BPM position))
+        self.bpm_amp_phase_entrance_funcions = (Function(),Function())
         #---------------------------------------------------------------------
         #---- Phase difference between phases bpm_wrapper1 and bpm_wrapper0 
         #---- vs. cavity phase
         self.phaseDiffBPM01_func = Function()
-        self.bpm_wrappers = bpm_wrappers
         #--- use or not in phase scan analysis: self.bpm_wrappers_useInPhaseAnalysis[bpm_wrapper,]
         self.bpm_wrappers_useInPhaseAnalysis = []
         for bpm_wrapper in self.bpm_wrappers:

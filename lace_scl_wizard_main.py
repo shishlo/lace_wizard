@@ -128,7 +128,11 @@ class LACE_SCL_Wizard:
     def dumpWizardDataAs(self):
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog
-        fileName, _ = QFileDialog.getSaveFileName(self.mainWindow,"QFileDialog.getSaveFileName()","","Scan Data Files (*.xml)", options=options)
+        fileName, _ = QFileDialog.getSaveFileName(self.mainWindow,
+            "QFileDialog.getSaveFileName()",
+            "",
+            "Scan Data Files (*.xml)", 
+            options=options)
         if(fileName[-4:] != ".xml"): fileName += ".xml"
         if fileName:
             self.data_file_name = fileName
@@ -144,7 +148,19 @@ class LACE_SCL_Wizard:
             for controller in self.controllers_arr:
                 controller.readCntrlDataFromDA(wizard_da)
             self.data_file_name = fileName
-            self.mainWindow.setWindowTitle("ESS DTL Wizard - "+str(fileName))   
+            self.mainWindow.setWindowTitle("ESS DTL Wizard - "+str(fileName))
+            
+    def readOpenXAL_Doc(self):
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog  
+        fileName, _ = QFileDialog.getOpenFileName(
+            self.mainWindow,                        # Parent widget
+            "Import data from OpenXAL Wizard Doc",  # Caption (dialog title)
+            "../../..",                             # Directory
+            "Scan Data Files (*.sclw)",             # Filter (semicolon-separated)
+            options=options)
+        if fileName:
+            print ("debug filename=",fileName)
 
 class LACE_SCL_Wizard_MainWindow(QMainWindow):
     def __init__(self, lace_scl_wizard):
@@ -160,6 +176,7 @@ class LACE_SCL_Wizard_MainWindow(QMainWindow):
         fileMenu = QMenu("&File", self)
         menuBar.addMenu(fileMenu)
         fileMenu.addAction(self.readScanAction)
+        fileMenu.addAction(self.readOpenXAL_Action)
         fileMenu.addAction(self.saveScanAction)
         fileMenu.addAction(self.saveAsScanAction)       
         # Creating menus using a title
@@ -170,9 +187,11 @@ class LACE_SCL_Wizard_MainWindow(QMainWindow):
     def _createActions(self):
         #---- File menu acctions
         self.readScanAction = QAction("&Open...", self)
+        self.readOpenXAL_Action = QAction("&Read OpenXAL Doc", self)
         self.saveScanAction = QAction("&Save...", self)
         self.saveAsScanAction = QAction("&Save As...", self)
         self.readScanAction.triggered.connect(self.lace_scl_wizard.readWizardData)
+        self.readOpenXAL_Action.triggered.connect(self.lace_scl_wizard.readOpenXAL_Doc)
         self.saveScanAction.triggered.connect(self.lace_scl_wizard.dumpWizardData)
         self.saveAsScanAction.triggered.connect(self.lace_scl_wizard.dumpWizardDataAs)
         

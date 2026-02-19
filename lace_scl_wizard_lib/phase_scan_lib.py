@@ -192,9 +192,9 @@ class PhaseScan_Runner(QRunnable):
             self.signals.scan_data_changed.emit(("status_update",msg_txt))
             #---- cav index in the table
             cav_ind = self.cavs_data_table_model.cav_wrappers.index(cav_wrapper)
-            #####self.cavs_table_view.clearSelection()
+            self.signals.scan_data_changed.emit(("table_selection_clear",))
             if(cav_wrapper.isGood == False): continue
-            #####self.cavs_table_view.selectRow(cav_ind)
+            self.signals.scan_data_changed.emit(("table_selection_set",cav_ind))
             #---- collect statistics for energy measurents
             if(self.eKin_measure_button.isChecked()):
                 self.blankCavities(cav_ind)
@@ -208,10 +208,12 @@ class PhaseScan_Runner(QRunnable):
                          self.signals.scan_data_changed.emit(("status_update",msg_txt))
                     self.scan_stopper.setShouldStop(False)
                     self.scan_stopper.setIsRunning(False)
+                    self.signals.scan_data_changed.emit(("status_update","Scan stopped by user's request"))
+                    self.signals.scan_data_changed.emit(("table_selection_set",cav_ind))
                     return
                 cav_wrapper.eKin_guess = eKin
                 cav_wrapper.eKin_guess_err = eKin_err
-                cav_wrapper.bpm_amp_phase_in_funcions = (amp_pos_func, phase_pos_func)
+                cav_wrapper.bpm_amp_phase_entrance_funcions = (amp_pos_func, phase_pos_func)
                 self.blankCavities(cav_ind + 1)
             #---- scan process
             self.initAmpPhaseFunctions(cav_wrapper)
@@ -222,25 +224,27 @@ class PhaseScan_Runner(QRunnable):
                     self.scan_stopper.setShouldStop(False)
                     self.scan_stopper.setIsRunning(False)
                     #cav_wrapper.setEPICS_CavityPhase(cav_phase_init)
+                    self.signals.scan_data_changed.emit(("status_update","Scan stopped by user's request"))
+                    self.signals.scan_data_changed.emit(("table_selection_set",cav_ind))
                     return
                 #cav_wrapper.setEPICS_CavityPhase(cav_phase)
                 time.sleep(sleep_time)
                 self.measureBPMsVsCavPhase(cav_wrapper,cav_phase)
                 print ("debug phase =",cav_phase)
-                self.signals.scan_data_changed.emit(("update_phase_diff_plot",cav_wrapper))
+                self.signals.scan_data_changed.emit(("update_bpm_phases_plot",cav_wrapper))
                 cav_phase += phase_step
             #cav_wrapper.setEPICS_CavityPhase(cav_phase_init)
             result = self.wrappAllPhasesForBPMs(cav_wrapper)
-            self.signals.scan_data_changed.emit(("update_phase_diff_plot",cav_wrapper))         
+            self.signals.scan_data_changed.emit(("update_bpm_phases_plot",cav_wrapper))         
             cav_wrapper.isMeasured = True
-            #####self.cavs_scan_cntrl.cavs_data_table_model.tableChanged()
+            self.signals.scan_data_changed.emit(("table_changed",))
         #--------- END of SCAN
         time_scan = time.time() - time_start
         msg_txt = "Phase scan finished. Time[sec] = "+"%7.1f"%time_scan
-        self.signals.scan_data_changed.emit(("status_update",msg_txt))        
+        self.signals.scan_data_changed.emit(("status_update",msg_txt))
+        self.signals.scan_data_changed.emit(("table_selection_clear",))
+        self.signals.scan_data_changed.emit(("table_changed",))
         self.scan_stopper.setShouldStop(False)
         self.scan_stopper.setIsRunning(False)
-        #---- clear selection 
-        #####self.cavs_table_view.clearSelection()
         return
            

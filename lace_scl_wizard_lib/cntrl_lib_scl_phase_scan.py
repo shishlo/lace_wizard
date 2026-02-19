@@ -28,8 +28,8 @@ from PySide6.QtWidgets import (
     )
 
 from PySide6.QtCore import (
-    Qt,Slot,
-    QRunnable, QObject, QThreadPool, Slot, Signal,
+    Qt, Slot,
+    QRunnable, QObject, QThreadPool, Signal,
     QAbstractTableModel,
     QSize
     )
@@ -103,6 +103,7 @@ class Cavs_Scan_Cntrl:
         self.bpms_table_view.horizontalHeader().setSectionResizeMode(0,QHeaderView.ResizeToContents)
         self.bpms_table_view.horizontalHeader().setSectionResizeMode(1,QHeaderView.ResizeMode.Stretch)
         self.bpms_table_view.horizontalHeader().setSectionResizeMode(2,QHeaderView.ResizeMode.Stretch)
+        self.bpms_table_view.selectionModel().selectionChanged.connect(self.bpmsSelectionChanged)
 
         #---- Tab for BPM table name
         self.bpms_tab_panel = QTabWidget()
@@ -135,8 +136,11 @@ class Cavs_Scan_Cntrl:
         main_layout.addWidget(central_view,1)
         main_layout.addWidget(self.bottom_panel_cntrl.getMainWidget(),1)
         
-        #---- set up plots
-        (self.bpm_phase_diff_plot,self.bpm_phase_diff_data) = self.getPlotAndDataPhaseScan()
+        #---- Set up plots. Plots themselves are belongs to self.bottom_panel_cntrl
+        self.bpm_phase_diff_line = self.getLineBPM_DiffPhaseScan()
+        self.setupBPM_PhaseAmpPlots()
+        #---- lines Phase&Amp. vs Cav. Phase on the two bottom plots
+        self.bpm_phase_amp_lines = []
         
         #---- Signals for table and plot update during the phasee scan thread execution
         self.scan_worker_signals = ScanWorkerSignals()
@@ -157,14 +161,18 @@ class Cavs_Scan_Cntrl:
 
     def getCavWrappers(self):
         return self.cav_wrappers
-        
+    
+    @Slot("QtCore.QItemSelection*")
     def cavsSelectionChanged(self,selected,deselected):
         """ Updates right BPM table for particular cavity with selected index """
         #---- selected.indexes() and deselected.indexes() with index.row() and index.column()
-        print ("debug cavsSelectionChanged selected=",selected.indexes())
-        if(len(selected.indexes()) <= 0):
+        if(selected.isEmpty()):
             self.bpms_tab_panel.setTabText(0,"Cavity None")
             self.bpms_use_table_model.setCavWrapper(None)
+            title = "Phase Scan. Cavity = None"
+            self.bottom_panel_cntrl.bpm_phase_diff_plot.setTitle(title)
+            self.bottom_panel_cntrl.bpmPhasePlot().setTitle(title)
+            self.bottom_panel_cntrl.bpmAmpPlot().setTitle(title)            
             return
         row = selected.indexes()[0].row()
         #----
@@ -172,10 +180,56 @@ class Cavs_Scan_Cntrl:
         self.bpms_tab_panel.setTabText(0,cav_wrapper.getAlias())
         self.bpms_use_table_model.setCavWrapper(cav_wrapper)
         #---- plot the graph of phase difference for bpm 0 and 1
-        self.bpm_phase_diff_plot.setTitle("Phase Scan" + " Cvaity " + cav_wrapper.getAlias())
+        title = "Phase Scan. Cavity = " + cav_wrapper.getAlias()
+        self.bottom_panel_cntrl.bpm_phase_diff_plot.setTitle(title)
+        self.bottom_panel_cntrl.bpmPhasePlot().setTitle(title)
+        self.bottom_panel_cntrl.bpmAmpPlot().setTitle(title)
         (x_arr,y_arr,y_err_arr) = cav_wrapper.phaseDiffBPM01_func.getXYErrLists()
-        self.bpm_phase_diff_data.setData(x_arr,y_arr)
+        self.bpm_phase_diff_line.setData(x_arr,y_arr)
+        self.bpmsSelectionChanged(None,None)
+    
+    @Slot("QtCore.QItemSelection*")
+    def bpmsSelectionChanged(self,selected,deselected):
+        #---- clean all old lines
+        bpm_phase_plot = self.bottom_panel_cntrl.bpmPhasePlot()
+        bpm_amp_plot = self.bottom_panel_cntrl.bpmAmpPlot()        
+        for (plot_amp_line_ref,plot_phase_line_ref) in self.bpm_phase_amp_lines:
+            if(plot_amp_line_ref != None):
+                bpm_amp_plot.removeItem(plot_amp_line_ref)
+                plot_amp_line_ref.deleteLater()
+                plot_amp_line_ref = None
+            if(plot_phase_line_ref != None):
+                bpm_phase_plot.removeItem(plot_phase_line_ref)
+                plot_phase_line_ref.deleteLater()
+                plot_phase_line_ref = None
+        #---- 
+        self.bpm_phase_amp_lines.clear()
+        cav_wrapper = self.bpms_use_table_model.cav_wrapper
+        if(cav_wrapper == None): return
+        index_rows = self.bpms_table_view.selectionModel().selectedRows()
+        for index_row in index_rows:
+            row_ind = index_row.row()
+            bpm_wrapper = self.bpm_wrappers[row_ind]
+            bpm_alias = bpm_wrapper.getAlias()
+            (bpm_amp_line_ref,bpm_phase_line_ref) = self.getBPM_AmpPhaseLines(cav_wrapper,bpm_wrapper)
+            (funcAmp,funcPhase) = cav_wrapper.bpm_amp_phase_dict[bpm_alias]
+            (x_arr,y_arr,y_err_arr) = funcAmp.getXYErrLists()
+            bpm_amp_line_ref.setData(x_arr,y_arr)
+            (x_arr,y_arr,y_err_arr) = funcPhase.getXYErrLists()
+            bpm_phase_line_ref.setData(x_arr,y_arr)          
+            self.bpm_phase_amp_lines.append((bpm_amp_line_ref,bpm_phase_line_ref))     
 
+    def getBPM_AmpPhaseLines(self,cav_wrapper,bpm_wrapper):
+        colors = ['w','r','g','b']
+        color = colors[len(self.bpm_phase_amp_lines) % len(colors)]
+        bpm_amp_plot = self.bottom_panel_cntrl.bpmAmpPlot()
+        bpm_phase_plot = self.bottom_panel_cntrl.bpmPhasePlot()
+        bpm_alias = bpm_wrapper.getAlias()
+        bpm_amp_line = bpm_amp_plot.plot(pen='white', linestyle="-", symbol="o", symbolBrush=color,marker_size=3, name=html.unescape("Amp;<sub>"+bpm_alias+"</sub>"))
+        bpm_phase_line = bpm_phase_plot.plot(pen='white', linestyle="-", symbol="o", symbolBrush=color,marker_size=3, name=html.unescape("&phi;<sub>"+bpm_alias+"</sub>"))
+        return (bpm_amp_line,bpm_phase_line)
+        
+        
     def dumpCntrlDataToDA(self,parent_da):
         """ Puts this controller data into the Data Adaptor """
         return
@@ -184,9 +238,12 @@ class Cavs_Scan_Cntrl:
         """ Reads data for this controller from the Data Adaptor """
         return
 
-    def getPlotAndDataPhaseScan(self):
-        """ Adds plot data to the PlotWidget instance """ 
-        bpm_phase_diff_plot = self.bottom_panel_cntrl.bpm_phase_diff_plot
+    def getLineBPM_DiffPhaseScan(self):
+        """ 
+        Sets up parameters of PlotWidget instance and 
+        adds plot of difference BPM12 phases vs. cavity phase 
+        """ 
+        bpm_phase_diff_plot = self.bottom_panel_cntrl.bpmPhaseDiffPlot()
         bpm_phase_diff_plot.showGrid(True, True)
         legend = bpm_phase_diff_plot.addLegend(labelTextSize='12pt', labelTextColor="white")
         legend.anchor((0, 0), (0, 0))
@@ -195,10 +252,31 @@ class Cavs_Scan_Cntrl:
         bpm_phase_diff_plot.setLabel('left', html.unescape("&Delta; &phi;<sub>12</sub>"), units='deg')
         bpm_phase_diff_plot.getAxis('left').setTextPen('white')
         bpm_phase_diff_plot.getAxis('bottom').setTextPen('white')
-        
-        bpm_phase_diff_data = bpm_phase_diff_plot.plot(pen='white', linestyle="-", symbol="o", symbolBrush='r',marker_size=5, name=html.unescape("&Delta; &phi;<sub>12</sub>"))
-        
-        return (bpm_phase_diff_plot,bpm_phase_diff_data)
+        #---- Now these data will be shown on the plot
+        bpm_phase_diff_line = bpm_phase_diff_plot.plot(pen='white', linestyle="-", symbol="o", symbolBrush='r',marker_size=5, name=html.unescape("&Delta; &phi;<sub>12</sub>"))
+        return bpm_phase_diff_line
+    
+    def setupBPM_PhaseAmpPlots(self):
+        """ Adds plot data to the PlotWidget instance for bpm  amp. and phase vs. cav. phase """
+        bpm_phase_plot = self.bottom_panel_cntrl.bpmPhasePlot()
+        bpm_phase_plot.showGrid(True, True)
+        legend = bpm_phase_plot.addLegend(labelTextSize='12pt', labelTextColor="white")
+        legend.anchor((0, 0), (0, 0))
+        bpm_phase_plot.setTitle("BPM Phase")
+        bpm_phase_plot.setLabel('bottom', html.unescape("Cavity EPICS &phi;"), units='deg')
+        bpm_phase_plot.setLabel('left', html.unescape("&phi;<sub>BPM</sub>"), units='deg')
+        bpm_phase_plot.getAxis('left').setTextPen('white')
+        bpm_phase_plot.getAxis('bottom').setTextPen('white')
+        #-----------------------------------------------
+        bpm_amp_plot = self.bottom_panel_cntrl.bpmAmpPlot()
+        bpm_amp_plot.showGrid(True, True)
+        legend = bpm_amp_plot.addLegend(labelTextSize='12pt', labelTextColor="white")
+        legend.anchor((0, 0), (0, 0))
+        bpm_amp_plot.setTitle("BPM Amplitude")
+        bpm_amp_plot.setLabel('bottom', html.unescape("Cavity EPICS &phi;"), units='deg')
+        bpm_amp_plot.setLabel('left', html.unescape("Amp<sub>BPM</sub>"), units='mA')
+        bpm_amp_plot.getAxis('left').setTextPen('white')
+        bpm_amp_plot.getAxis('bottom').setTextPen('white')            
 
     @Slot(tuple)     
     def scanDataUpdate(self,tuple_input):
@@ -209,10 +287,22 @@ class Cavs_Scan_Cntrl:
             msg_txt = rest[0]
             self.upper_panel_cntrl.scan_status_text.setText(msg_txt)
             return
-        if(update_type == "update_phase_diff_plot"):
+        if(update_type == "update_bpm_phases_plot"):
             cav_wrapper = rest[0]
             (x_arr,y_arr,y_err_arr) = cav_wrapper.phaseDiffBPM01_func.getXYErrLists()
-            self.bpm_phase_diff_data.setData(x_arr,y_arr)
+            self.bpm_phase_diff_line.setData(x_arr,y_arr)
+            self.bpmsSelectionChanged(None,None)
+        #---- Type of message - Scan status update
+        if(update_type == "table_selection_clear"):
+            self.cavs_table_view.clearSelection()
+            return
+        if(update_type == "table_selection_set"):
+            cav_ind = rest[0]
+            self.cavs_table_view.selectRow(cav_ind)
+            return
+        if(update_type == "table_changed"):
+            self.cavs_data_table_model.tableChanged() 
+            return          
         return
 
     def stopAllThreads(self):
@@ -721,7 +811,7 @@ class BPMsForAnalysisTableModel(LACE_DataTableModel):
             use = self.cav_wrapper.bpm_wrappers_useInPhaseAnalysis[bpm_ind]
             if(bpm_wrapper.isGood != True): use = False
             self.cav_wrapper.bpm_wrappers_useInPhaseAnalysis[bpm_ind] = use
-            item = self.item(bpm_ind,2); self._updateBoolItem(use,item)
+            item = self.item(bpm_ind,2); self._updateBoolItem(use,item)        
 
 #----------------------------------------------------------
 # Actions on events with buttons
