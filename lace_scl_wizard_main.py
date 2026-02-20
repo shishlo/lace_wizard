@@ -34,6 +34,7 @@ from lace_om_lib.scl_online_model_lib import SCL_Online_Model
 from lace_scl_wizard_lib.cntrl_lib_init_state import InitState_Cntrl
 from lace_scl_wizard_lib.cntrl_lib_scl_phase_scan import CavsPhaseScan_Cntrl
 from lace_scl_wizard_lib.energy_meter_lib import EnergyMeter
+from openxal_wizard_reader.xal_wizard_scan_file_reader_lib import XALtoSCL_TuneWizardUpdater
 
 class LACE_SCL_Wizard:
     """
@@ -151,6 +152,7 @@ class LACE_SCL_Wizard:
             self.mainWindow.setWindowTitle("ESS DTL Wizard - "+str(fileName))
             
     def readOpenXAL_Doc(self):
+        """
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog  
         fileName, _ = QFileDialog.getOpenFileName(
@@ -159,8 +161,12 @@ class LACE_SCL_Wizard:
             "../../..",                             # Directory
             "Scan Data Files (*.sclw)",             # Filter (semicolon-separated)
             options=options)
-        if fileName:
-            print ("debug filename=",fileName)
+        if (not fileName): return
+        """
+        fileName = '/home/shi/XAL_Data/SCL Wizard/ProductionSCL_RF_Phases_2025_09_15.sclw'
+        self.xal_to_scl_tune_wizard_updater = XALtoSCL_TuneWizardUpdater(self)
+        self.xal_to_scl_tune_wizard_updater.updateSCL_Tune_Wizard(fileName)
+        self.mainWindow.setWindowTitle("XAL Export: "+str(fileName))
 
 class LACE_SCL_Wizard_MainWindow(QMainWindow):
     def __init__(self, lace_scl_wizard):

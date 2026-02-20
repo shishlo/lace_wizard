@@ -51,8 +51,6 @@ class Cavity_Wrapper:
         self.epicsPhase = 0.
         self.epicsAmpInit = 0.
         self.epicsPhaseInit = 0.
-        #---- average acceleration phase
-        self.synch_pahse = -18.
         #-- design parameters will be defined after analysis of the phase scan data
         self.modelAmp = 0.
         self.modelPhase = 0.       
@@ -95,8 +93,6 @@ class Cavity_Wrapper:
         self.epicsPhase = 0.
         self.epicsAmpInit = 0.
         self.epicsPhaseInit = 0.
-        #---- average acceleration phase
-        self.synch_pahse = -18.
         #-- design parameters will be defined after analysis of the phase scan data
         self.modelAmp = 0.
         self.modelPhase = 0.       

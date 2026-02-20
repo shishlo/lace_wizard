@@ -1,0 +1,402 @@
+#! /usr/bin/env python
+
+"""
+This is a collection of classes to read OpenXAL SCL Wizard phase scan 
+XML file and prepare the scan tables for all SCL cavities 
+with data from all BPMs - phases, amplitudes, 
+x and y beam center positions.
+"""
+
+import sys
+import math
+import random
+import time
+
+# import the XmlDataAdaptor XML parser
+from orbit.utils.xml import XmlDataAdaptor
+from orbit.utils import NamedObject
+
+class XALtoSCL_TuneWizardUpdater:
+    """
+    This class reads the OpenXAL SCL Wizard Doc file and put the cavities
+    scan data into the SCL Tune Wizard based on PyORBIT
+    """
+    def __init__(self,lace_scl_wizard):
+        self.lace_scl_wizard = lace_scl_wizard
+        self.scl_scan_reader = None
+        
+    def updateSCL_Tune_Wizard(self,file_name):
+        self.scl_scan_reader = SCL_Wizard_File_Reader()
+        self.scl_scan_reader.readSCL_WizardXML(file_name)
+        print ("degug file name=",file_name)
+        #---- get initial energy from the the exit of the previous cavity
+        #---- The out energy of the cavity is defined by BPMs data
+        cav_wrappers = self.lace_scl_wizard.getCavWrappers()
+        for cav_wrapper in cav_wrappers:
+            xal_cavity_wrapper = self.scl_scan_reader.getXAL_CavityWrapperDict()["SCL:"+cav_wrapper.getAlias()]
+            cav_wrapper.isGood = xal_cavity_wrapper.is_good
+            cav_wrapper.eKin_in = xal_cavity_wrapper.eKin_In()
+            cav_wrapper.eKin_out = xal_cavity_wrapper.eKin_Out()
+            cav_wrapper.eKin_guess = cav_wrapper.eKin_out
+            cav_wrapper.synch_acc_phase = xal_cavity_wrapper.realSynchPhase
+            cav_wrapper.epicsAmp = xal_cavity_wrapper.EPICS_Amp() 
+            cav_wrapper.epicsPhase = xal_cavity_wrapper.EPICS_Phase()
+            cav_wrapper.epicsAmpInit = xal_cavity_wrapper.EPICS_Amp()
+            cav_wrapper.epicsPhaseInit =  xal_cavity_wrapper.EPICS_Phase()
+
+            #------ just test
+            eKinIn = xal_cavity_wrapper.eKin_In()
+            eKinOut = xal_cavity_wrapper.eKin_Out()
+            st  = "debug cav=" + xal_cavity_wrapper.getName()
+            st += " isGood = "+ str(xal_cavity_wrapper.is_good)
+            st += " eKinIn[MeV] = %8.3f "%eKinIn
+            st += " eKinOut[MeV] = %8.3f "%eKinOut
+            print (st)
+        #----------------------------------
+        self.lace_scl_wizard.init_state_cntrl.cavs_data_table_model.tableChanged()
+        
+    def calibrateCavityModel(self,cav_wrapper):
+        pass
+    
+    def initOM(self):
+        pass
+        
+class SCL_Wizard_File_Reader:
+    """
+    Reads SCL Wizard scans file and creates XmlDataAdaptor structure
+    """
+    def __init__(self):
+        self.cavs_scans_da = XmlDataAdaptor("empty")
+        self.scl_wizard_da = XmlDataAdaptor("empty")
+        self.scl_wizard_file_name = ""
+        self.xal_cavity_wrapper_dict = {}
+        self.quad_field_dict = {}
+
+    def getSCL_WizardFileName(self):
+        """
+        Returns initial OpenXAL Wizard XML file Name
+        """
+        return self.scl_wizard_file_name
+
+    def getSCL_ScansDA(self):
+        """ Returns the XmlDataAdaptor with cavities scan data """
+        return self.cavs_scans_da 
+        
+    def getSCL_WizardDA(self):
+        """ Returns the XmlDataAdaptor for the whole SCL Wizard """
+        return self.scl_wizard_da
+
+    def readSCL_WizardXML(self,xml_file_name):
+        """
+        Reads OpenXAL SCL Wizard phase scan XML file. 
+        Returns the XmlDataAdaptor with cavities scan data.
+        """
+        self.cavs_scans_da = XmlDataAdaptor("empty")
+        self.scl_wizard_da = XmlDataAdaptor("empty")
+        self.scl_wizard_file_name = ""
+        fl_in = open(xml_file_name,"r")
+        lns = fl_in.readlines()
+        fl_in.close()
+        if(lns[1].find("LINAC_Wizard") < 0): return
+        self.scl_wizard_file_name = xml_file_name
+        #----------------------------
+        namespace_txt =  ' xmlns:SCL_Diag="SCL_Diag" xmlns:HEBT_Diag="HEBT_Diag" ' 
+        namespace_txt += ' xmlns:SCL_Mag="SCL_Mag" xmlns:HEBT_Mag="HEBT_Mag" '
+        namespace_txt += ' xmlns:SCL="SCL" xmlns:HEBT="HEBT" '
+        lns[1] = lns[1].replace("LINAC_Wizard ","LINAC_Wizard " + namespace_txt)
+        #----------------------------
+        txt = ""
+        for ln in lns:
+            txt += ln
+        self.scl_wizard_da = XmlDataAdaptor.adaptorForString(txt)
+        self._cleanNameSpaces(self.scl_wizard_da)
+        #----------------------------
+        self.cavs_scans_da = self._getSCL_Scans_DA()
+        self.createXAL_CavityWrapperDict()
+        self.createXAL_QuadFieldDict()
+        return self.scl_wizard_da
+        
+    def _getSCL_Scans_DA(self):
+        """ Extracts scan data from the whole DA """
+        scl_tuneup_data_da = self.scl_wizard_da.childAdaptors("SCL_Longitudinal_Tuneup_Data")[0]
+        cavs_scans_da = scl_tuneup_data_da.childAdaptors("Cavs_Parameters_and_Data")[0]
+        return cavs_scans_da 
+
+    def _cleanNameSpaces(self,child_in_da):
+        """
+        This method recursively transform node names from {SCL_Diag}BPM
+        to SCL_Diag:BPM etc.
+        """
+        child_da_arr = child_in_da.childAdaptors()
+        if(len(child_da_arr) == 0): return
+        for child_da in child_in_da.childAdaptors():
+            name_init = child_da.getName()
+            if(name_init.find("{") >= 0): 
+                name = name_init.replace("{","")
+                name = name.replace("}",":")
+                child_da.setName(name)
+                #print ("name_init = ",name_init," new = ",name)
+            self._cleanNameSpaces(child_da)
+            
+    def createXAL_CavityWrapperDict(self):
+        """ It will create a dictionary with XAL_CavityScanDataWrapper instance vs. cavity name """
+        xal_cavity_wrapper_dict = {}
+        cavs_scans_da = self.getSCL_ScansDA()
+        for cav_scan_da in cavs_scans_da.childAdaptors():
+            cav_is_good = cav_scan_da.intValue("isAnalyzed")*cav_scan_da.intValue("isGood")
+            if(cav_is_good > 0): 
+                cav_is_good = True
+            else:
+                cav_is_good = False
+            params_da = cav_scan_da.childAdaptors("Params")[0]
+            cav_epics_phase = params_da.doubleValue("livePhase")
+            cav_epics_amp = params_da.doubleValue("initLiveAmp")    
+            cav_xal_model_amp = params_da.doubleValue("designAmp")
+            cav_xal_model_phase = params_da.doubleValue("designPhase")
+            goal_synch_phase = params_da.doubleValue("scanPhaseShift")
+            real_synch_phase = params_da.doubleValue("real_scanPhaseShift")
+            eKin_in = params_da.doubleValue("eKin_in")
+            eKin_out = params_da.doubleValue("bpm_eKin_out")
+            cav_name = cav_scan_da.stringValue("cav")
+            if(cav_scan_da.getName() == "AllOff"): cav_name = "AllOff"
+            #print ("debug cav = ",cav_name," cav. phase = %7.2f"%cav_epics_phase)
+            xal_cav_wrapper = XAL_CavityScanDataWrapper(cav_name)
+            xal_cav_wrapper.isGood(cav_is_good)
+            xal_cav_wrapper.EPICS_Phase(cav_epics_phase)
+            xal_cav_wrapper.EPICS_Amp(cav_epics_amp)
+            xal_cav_wrapper.XAL_Model_Amp(cav_xal_model_amp)
+            xal_cav_wrapper.XAL_Model_Phase(cav_xal_model_phase)
+            xal_cav_wrapper.goalSynchPhase(goal_synch_phase)
+            xal_cav_wrapper.realSynchPhase(real_synch_phase)
+            xal_cav_wrapper.eKin_In(eKin_in)
+            xal_cav_wrapper.eKin_Out(eKin_out)
+            #---- eKinOut list from bpm data analysis
+            xal_cav_wrapper.getCavity_PhaseArr().clear()
+            xal_cav_wrapper.eKin_Out_Arr().clear()
+            eKin_out_da =  cav_scan_da.childAdaptors("Ekin_Out_GD")[0]
+            st_x_arr = eKin_out_da.childAdaptors("x")[0].stringValue("arr").split()
+            st_y_arr = eKin_out_da.childAdaptors("y")[0].stringValue("arr").split()
+            for ind,st_x in enumerate(st_x_arr):
+                st_y = st_y_arr[ind]
+                xal_cav_wrapper.getCavity_PhaseArr().append(float(st_x))
+                xal_cav_wrapper.eKin_Out_Arr().append(float(st_y))
+            #----------------------------------------
+            scan_data_da = cav_scan_da.childAdaptors("scan_data")[0]
+            for bpm_da in scan_data_da.childAdaptors():
+                #--------------------------------------------
+                phase_da = bpm_da.childAdaptors("phase")[0]
+                cav_phase_arr = []
+                st_arr = phase_da.childAdaptors("x")[0].stringValue("arr").split()
+                for st in st_arr:
+                    cav_phase_arr.append(float(st))
+                #--------------------------------------------
+                bpm_phase_arr = []
+                st_arr = phase_da.childAdaptors("y")[0].stringValue("arr").split()
+                for st in st_arr:
+                    bpm_phase_arr.append(float(st))             
+                #--------------------------------------------
+                amp_da = bpm_da.childAdaptors("amplitude")[0]
+                bpm_amp_arr = []
+                st_arr = amp_da.childAdaptors("y")[0].stringValue("arr").split()
+                for st in st_arr:
+                    bpm_amp_arr.append(float(st))                   
+                #--------------------------------------------
+                bpm_x_arr = []
+                bpm_y_arr = []
+                if(len(bpm_da.childAdaptors("posX")) != 0 and len(bpm_da.childAdaptors("posY")) != 0):
+                    posX_da = bpm_da.childAdaptors("posX")[0] 
+                    st_arr = posX_da.childAdaptors("y")[0].stringValue("arr").split()
+                    for st in st_arr:
+                        bpm_x_arr.append(float(st))                 
+                    posY_da = bpm_da.childAdaptors("posY")[0]
+                    st_arr = posY_da.childAdaptors("y")[0].stringValue("arr").split()
+                    for st in st_arr:
+                        bpm_y_arr.append(float(st)) 
+                else:
+                    for ind in range(len(cav_phase_arr)):
+                        bpm_x_arr.append(0.)
+                        bpm_y_arr.append(0.)
+                #--------------------------------------------
+                bpm_name = bpm_da.getName().replace(":BPM","_Diag:BPM")
+                for ind,cav_phase in enumerate(cav_phase_arr):
+                    bpm_phase = bpm_phase_arr[ind]
+                    bpm_amp   = bpm_amp_arr[ind]
+                    bpm_x = bpm_x_arr[ind]
+                    bpm_y = bpm_y_arr[ind]
+                    xal_cav_wrapper.addScanPoint(bpm_name,cav_phase,bpm_phase,bpm_amp,bpm_x,bpm_y)
+                """
+                print ("debug cav_name=",cav_name," bpm_name=",bpm_name)
+                print ("debug cav_phase_arr = ",cav_phase_arr)
+                print ("debug bpm_phase_arr = ",bpm_phase_arr)
+                print ("debug bpm_amp_arr = ",bpm_amp_arr)
+                print ("debug bpm_x_arr = ",bpm_x_arr)
+                print ("debug bpm_y_arr = ",bpm_y_arr)
+                if(cav_name == "SCL_RF:Cav01a" and bpm_name == "SCL_Diag:BPM05"): sys.exit(0)
+                """
+            #-----------------------------------------------
+            xal_cavity_wrapper_dict[cav_name.replace("_RF","")] = xal_cav_wrapper
+        #-----------------------------------------------
+        self.xal_cavity_wrapper_dict = xal_cavity_wrapper_dict 
+        return xal_cavity_wrapper_dict
+        
+    def getXAL_CavityWrapperDict(self):
+        """ Returns a dictionary with cavity wrappers classes """
+        return self.xal_cavity_wrapper_dict
+        
+    def createXAL_QuadFieldDict(self):
+        """ Creates a dictionary for quadrupole fileds in SCL and HEBT1 """
+        scl_wizard_da = self.getSCL_WizardDA()
+        scl_tuneup_data_da = scl_wizard_da.childAdaptors("SCL_Longitudinal_Tuneup_Data")[0]
+        quad_fields_da = scl_tuneup_data_da.childAdaptors("SCL_QUADS_FIELDS")[0]
+        quad_field_dict = {}
+        for quad_da in quad_fields_da.childAdaptors():
+            quad_field_dict[quad_da.getName()] = quad_da.doubleValue("field")
+            #print ("debug quad=",quad_da.getName()," field=",quad_field_dict[quad_da.getName()])
+        self.quad_field_dict = quad_field_dict
+        return quad_field_dict      
+        
+    def getXAL_QuadFieldDict(self):
+        """ Returns a dictionary for quadrupole fileds in SCL and HEBT1 """
+        return self.quad_field_dict
+    
+class XAL_CavityScanDataWrapper(NamedObject):
+    """
+    Keeps arrays of phases, amplitudes, x adn y positions as a function of 
+    cavity phases.
+    For cavity it keeps:
+    cavity name
+    cavity EPICS phase
+    """
+    def __init__(self, name):
+        NamedObject.__init__(self, name)
+        #---- self.bpm_data_dict[bpm_name] = [cav_phase_arr,bpm_phase_arr,bpm_amp_arr,bpm_x_arr,bpm_y_arr]
+        self.is_good = False
+        self.bpm_data_dict = {}
+        self.cav_epics_phase = 0.
+        self.cav_epics_amp = 0.
+        self.cav_xal_model_amp = 0.
+        self.goal_synch_phase = 0.
+        self.real_synch_phase = 0.
+        self.eKin_out = 0.
+        self.eKin_in = 0.
+        #---- eKin_out list from BPMs phase analysis in SCL Wizard
+        self.cav_phase_arr = []
+        self.eKin_out_arr = []
+        
+    def clear(self):
+        """ Removes all data"""
+        self.is_good = False
+        self.bpm_data_dict = {}
+        self.cav_epics_phase = 0.
+        self.cav_epics_amp = 0.
+        self.goal_synch_phase = 0.
+        self.real_synch_phase = 0.
+        self.eKin_out = 0.
+        self.eKin_in = 0.
+        #---- eKin_out list from BPMs phase analysis in SCL Wizard
+        self.cav_phase_arr.clear()
+        self.eKin_out_arr.clear()
+        
+    def isGood(self,is_good = None):
+        if(is_good == None): return self.is_good
+        self.is_good = is_good
+        return self.is_good
+
+    def EPICS_Phase(self,cav_epics_phase = None):
+        """ Sets / gets EPICS phase of the cavity in deg. """
+        if(cav_epics_phase == None): return self.cav_epics_phase
+        self.cav_epics_phase = cav_epics_phase
+        return self.cav_epics_phase
+        
+    def EPICS_Amp(self,cav_epics_amp = None):
+        """ Sets / gets EPICS amp of the cavity in deg. """
+        if(cav_epics_amp == None): return self.cav_epics_amp
+        self.cav_epics_amp = cav_epics_amp
+        return self.cav_epics_amp
+        
+    def XAL_Model_Amp(self,cav_xal_model_amp = None):
+        """ Sets / gets OpenXAL Model amp of the cavity in MV/m """
+        if(cav_xal_model_amp  == None): return self.cav_xal_model_amp 
+        self.cav_xal_model_amp  = cav_xal_model_amp 
+        return self.cav_xal_model_amp
+        
+    def XAL_Model_Phase(self,cav_xal_model_phase = None):
+        """ Sets / gets OpenXAL Model 1st gap phase of the cavity in deg. """
+        if(cav_xal_model_phase == None): return self.cav_xal_model_phase
+        self.cav_xal_model_phase = cav_xal_model_phase
+        return self.cav_xal_model_phase
+        
+    def goalSynchPhase(self,goal_synch_phase = None):
+        """ Sets/ gets the goal for cavity synchronous phase """
+        if(goal_synch_phase == None): return self.goal_synch_phase
+        self.goal_synch_phase = goal_synch_phase
+        return self.goal_synch_phase
+        
+    def realSynchPhase(self,real_synch_phase = None):
+        """ Sets / gets the real for cavity synchronous phase """
+        if(real_synch_phase == None): return self.real_synch_phase
+        self.real_synch_phase = real_synch_phase
+        return self.real_synch_phase
+        
+    def eKin_In(self,eKin_in = None):
+        """ Sets / gets the energy before cavity """
+        if(eKin_in == None): return self.eKin_in
+        self.eKin_in = eKin_in
+        return self.eKin_in
+        
+    def eKin_Out(self,eKin_out = None):
+        """ Sets / gets the energy after cavity """
+        if(eKin_out == None): return self.eKin_out
+        self.eKin_out = eKin_out
+        return self.eKin_out
+        
+    def eKin_Out_Arr(self):
+        return self.eKin_out_arr
+
+    def addScanPoint(self,bpm_name,cav_phase,bpm_phase,bpm_amp,bpm_x,bpm_y):
+        """ We have to add points in order according to cav_phase """
+        if(not (bpm_name in self.bpm_data_dict)):
+            #print ("debug  =========== bpm_name=",bpm_name)
+            self.bpm_data_dict[bpm_name] = [[cav_phase,],[bpm_phase,],[bpm_amp,],[bpm_x,],[bpm_y]]
+        else:
+            self.bpm_data_dict[bpm_name][0].append(cav_phase)
+            self.bpm_data_dict[bpm_name][1].append(bpm_phase)
+            self.bpm_data_dict[bpm_name][2].append(bpm_amp)
+            self.bpm_data_dict[bpm_name][3].append(bpm_x)
+            self.bpm_data_dict[bpm_name][4].append(bpm_y)
+
+    def getNumberPhasePoints(self,bpm_name):
+        if(not (bpm_name in self.bpm_data_dict)): return 0
+        return len(self.bpm_data_dict[bpm_name][0])
+
+    def getValuesForIndex(self,bpm_name,index):
+        """ Returns  (cav_phase,bpm_phase,bpm_amp,bpm_x,bpm_y) for cav_phase index """
+        if(not (bpm_name in self.bpm_data_dict)): return None
+        if(index >= self.getNumberPhasePoints(bpm_name)): return None
+        cav_phase = self.bpm_data_dict[bpm_name][0][index]
+        bpm_phase = self.bpm_data_dict[bpm_name][0][index]
+        bpm_amp   = self.bpm_data_dict[bpm_name][0][index]
+        bpm_x     = self.bpm_data_dict[bpm_name][0][index]
+        bpm_y     = self.bpm_data_dict[bpm_name][0][index]
+        return (cav_phase,bpm_phase,bpm_amp,bpm_x,bpm_y)
+
+    def getCavity_PhaseArr(self,bpm_name = None):
+        if(not (bpm_name in self.bpm_data_dict) or bpm_name == None): 
+            return self.cav_phase_arr
+        return self.bpm_data_dict[bpm_name][0]      
+        
+    def getBPM_PhaseArr(self,bpm_name):
+        if(not (bpm_name in self.bpm_data_dict)): return []
+        return self.bpm_data_dict[bpm_name][1]
+        
+    def getBPM_AmpArr(self,bpm_name):
+        if(not (bpm_name in self.bpm_data_dict)): return []
+        return self.bpm_data_dict[bpm_name][2]
+        
+    def getBPM_X_Arr(self,bpm_name):
+        if(not (bpm_name in self.bpm_data_dict)): return []
+        return self.bpm_data_dict[bpm_name][3]
+        
+    def getBPM_Y_Arr(self,bpm_name):
+        if(not (bpm_name in self.bpm_data_dict)): return []
+        return self.bpm_data_dict[bpm_name][4]  
