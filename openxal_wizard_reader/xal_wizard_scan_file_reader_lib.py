@@ -25,6 +25,12 @@ class XALtoSCL_TuneWizardUpdater:
         self.lace_scl_wizard = lace_scl_wizard
         self.scl_scan_reader = None
         
+    def getBPM_Wrapper(self,alias):
+        bpm_wrappers = self.lace_scl_wizard.getBPM_Wrappers()
+        for bpm_wrapper in bpm_wrappers:
+            if(bpm_wrapper.getAlias() == alias): return bpm_wrapper
+        return None
+        
     def updateSCL_Tune_Wizard(self,file_name):
         self.scl_scan_reader = SCL_Wizard_File_Reader()
         self.scl_scan_reader.readSCL_WizardXML(file_name)
@@ -35,15 +41,20 @@ class XALtoSCL_TuneWizardUpdater:
         for cav_wrapper in cav_wrappers:
             xal_cavity_wrapper = self.scl_scan_reader.getXAL_CavityWrapperDict()["SCL:"+cav_wrapper.getAlias()]
             cav_wrapper.isGood = xal_cavity_wrapper.is_good
+            (bpm0_name,bpm1_name) = xal_cavity_wrapper.getBPMs01()
             cav_wrapper.eKin_in = xal_cavity_wrapper.eKin_In()
             cav_wrapper.eKin_out = xal_cavity_wrapper.eKin_Out()
             cav_wrapper.eKin_guess = cav_wrapper.eKin_out
-            cav_wrapper.synch_acc_phase = xal_cavity_wrapper.realSynchPhase
+            cav_wrapper.synch_acc_phase = xal_cavity_wrapper.realSynchPhase()
             cav_wrapper.epicsAmp = xal_cavity_wrapper.EPICS_Amp() 
             cav_wrapper.epicsPhase = xal_cavity_wrapper.EPICS_Phase()
             cav_wrapper.epicsAmpInit = xal_cavity_wrapper.EPICS_Amp()
             cav_wrapper.epicsPhaseInit =  xal_cavity_wrapper.EPICS_Phase()
-
+            cav_wrapper.bpm_wrapper0 = self.getBPM_Wrapper(bpm0_name)
+            cav_wrapper.bpm_wrapper1 = self.getBPM_Wrapper(bpm1_name)
+            #print ("debug cav=",cav_wrapper.getAlias()," bpm 0,1 =", (bpm0_name,bpm1_name))
+            #if(cav_wrapper.bpm_wrapper0 != None and cav_wrapper.bpm_wrapper1 != None):
+            #    print ("debug =========  self.bpm_wrapper 0 1 =",cav_wrapper.bpm_wrapper0.getAlias()," ",cav_wrapper.bpm_wrapper1.getAlias())
             #------ just test
             eKinIn = xal_cavity_wrapper.eKin_In()
             eKinOut = xal_cavity_wrapper.eKin_Out()
@@ -51,9 +62,38 @@ class XALtoSCL_TuneWizardUpdater:
             st += " isGood = "+ str(xal_cavity_wrapper.is_good)
             st += " eKinIn[MeV] = %8.3f "%eKinIn
             st += " eKinOut[MeV] = %8.3f "%eKinOut
-            print (st)
+            #print (st)
+            #----- ekin Out values vs. cav. phases 
+            cav_wrapper.eKin_out_func.clean()
+            cav_phase_arr = xal_cavity_wrapper.getCavity_PhaseArr()
+            ekinOut_arr = xal_cavity_wrapper.eKin_Out_Arr()
+            if(len(cav_phase_arr) == len(ekinOut_arr) and len(cav_phase_arr) > 0):
+                for cav_phase_ind,cav_phase in enumerate(cav_phase_arr):
+                    cav_wrapper.eKin_out_func.add(cav_phase,ekinOut_arr[cav_phase_ind])
+                    #print ("debug cav_phase ind =",cav_phase_ind," phase=",cav_phase," eKinout=",ekinOut_arr[cav_phase_ind])
+            if(cav_wrapper.isGood and cav_wrapper.eKin_out_func.getSize() > 0):
+                cav_wrapper.isMeasured = True
+            #---- set up BPM phases during the cavity phase scan
+            for bpm_wrapper in cav_wrapper.bpm_wrappers:
+                (ampFunc,phaseFunc) = cav_wrapper.bpm_amp_phase_dict[bpm_wrapper.getAlias()]
+                ampFunc.clean()
+                phaseFunc.clean()
+                bpm_amp_arr = xal_cavity_wrapper.getBPM_AmpArr(bpm_wrapper.getAlias())
+                bpm_phase_arr = xal_cavity_wrapper.getBPM_PhaseArr(bpm_wrapper.getAlias())
+                if(len(bpm_amp_arr) != len(bpm_phase_arr) or len(bpm_amp_arr) != len(cav_phase_arr)): continue
+                for cav_phase_ind,cav_phase in enumerate(cav_phase_arr):
+                    bpm_amp = bpm_amp_arr[cav_phase_ind]
+                    bpm_phase = bpm_phase_arr[cav_phase_ind]
+                    ampFunc.add(cav_phase,bpm_amp)
+                    phaseFunc.add(cav_phase,bpm_phase)
+            #---- fill out 
+            bpm_diff_arr = xal_cavity_wrapper.getBPM_DifferenceArr()
+            cav_wrapper.phaseDiffBPM01_func.clean()
+            for [cav_phase,bpm_diff_phase] in bpm_diff_arr:
+                cav_wrapper.phaseDiffBPM01_func.add(cav_phase,bpm_diff_phase)
         #----------------------------------
         self.lace_scl_wizard.init_state_cntrl.cavs_data_table_model.tableChanged()
+        self.lace_scl_wizard.cavs_phase_scan_cntrl.cavs_scan_cntrl.cavs_data_table_model.tableChanged()
         
     def calibrateCavityModel(self,cav_wrapper):
         pass
@@ -144,8 +184,12 @@ class SCL_Wizard_File_Reader:
         cavs_scans_da = self.getSCL_ScansDA()
         for cav_scan_da in cavs_scans_da.childAdaptors():
             cav_is_good = cav_scan_da.intValue("isAnalyzed")*cav_scan_da.intValue("isGood")
+            bpm0_name = "None"
+            bpm1_name = "None"
             if(cav_is_good > 0): 
                 cav_is_good = True
+                bpm0_name = cav_scan_da.stringValue("bpm0")
+                bpm1_name = cav_scan_da.stringValue("bpm1")
             else:
                 cav_is_good = False
             params_da = cav_scan_da.childAdaptors("Params")[0]
@@ -160,8 +204,14 @@ class SCL_Wizard_File_Reader:
             cav_name = cav_scan_da.stringValue("cav")
             if(cav_scan_da.getName() == "AllOff"): cav_name = "AllOff"
             #print ("debug cav = ",cav_name," cav. phase = %7.2f"%cav_epics_phase)
+            #----- BPMs phase difference between bpm0 and bpm1 vs cavity phase
+            bpm_phase_diff_da = cav_scan_da.childAdaptors("Phase_Diff_GD")[0]
+            bpm_phase_diff_x_arr = [float(st) for st in bpm_phase_diff_da.childAdaptors("x")[0].stringValue("arr").split()]
+            bpm_phase_diff_y_arr = [float(st) for st in bpm_phase_diff_da.childAdaptors("y")[0].stringValue("arr").split()]
+            #----------------------------------------------------------------------
             xal_cav_wrapper = XAL_CavityScanDataWrapper(cav_name)
             xal_cav_wrapper.isGood(cav_is_good)
+            xal_cav_wrapper.setBPMs01(bpm0_name,bpm1_name)
             xal_cav_wrapper.EPICS_Phase(cav_epics_phase)
             xal_cav_wrapper.EPICS_Amp(cav_epics_amp)
             xal_cav_wrapper.XAL_Model_Amp(cav_xal_model_amp)
@@ -217,7 +267,8 @@ class SCL_Wizard_File_Reader:
                         bpm_x_arr.append(0.)
                         bpm_y_arr.append(0.)
                 #--------------------------------------------
-                bpm_name = bpm_da.getName().replace(":BPM","_Diag:BPM")
+                #bpm_name = bpm_da.getName().replace(":BPM","_Diag:BPM")
+                bpm_name = bpm_da.getName()
                 for ind,cav_phase in enumerate(cav_phase_arr):
                     bpm_phase = bpm_phase_arr[ind]
                     bpm_amp   = bpm_amp_arr[ind]
@@ -233,6 +284,7 @@ class SCL_Wizard_File_Reader:
                 print ("debug bpm_y_arr = ",bpm_y_arr)
                 if(cav_name == "SCL_RF:Cav01a" and bpm_name == "SCL_Diag:BPM05"): sys.exit(0)
                 """
+            xal_cav_wrapper.setBPM_DifferenceArr(bpm_phase_diff_x_arr,bpm_phase_diff_y_arr)
             #-----------------------------------------------
             xal_cavity_wrapper_dict[cav_name.replace("_RF","")] = xal_cav_wrapper
         #-----------------------------------------------
@@ -271,6 +323,11 @@ class XAL_CavityScanDataWrapper(NamedObject):
         NamedObject.__init__(self, name)
         #---- self.bpm_data_dict[bpm_name] = [cav_phase_arr,bpm_phase_arr,bpm_amp_arr,bpm_x_arr,bpm_y_arr]
         self.is_good = False
+        #---- BPMs for Phase Difference sin-like scan data
+        self.bpm0_name = "None"
+        self.bpm1_name = "None"
+        #-----self.bpm_phase_diff_arr[cav_phase_ind] = [cav_phase,bpm_phase_diff] for bpm0 and bpm1
+        self.bpm_phase_diff_arr = []
         self.bpm_data_dict = {}
         self.cav_epics_phase = 0.
         self.cav_epics_amp = 0.
@@ -286,6 +343,8 @@ class XAL_CavityScanDataWrapper(NamedObject):
     def clear(self):
         """ Removes all data"""
         self.is_good = False
+        self.bpm0_name = "None"
+        self.bpm1_name = "None"        
         self.bpm_data_dict = {}
         self.cav_epics_phase = 0.
         self.cav_epics_amp = 0.
@@ -301,6 +360,23 @@ class XAL_CavityScanDataWrapper(NamedObject):
         if(is_good == None): return self.is_good
         self.is_good = is_good
         return self.is_good
+        
+    def setBPMs01(self,bpm0_name,bpm1_name):
+        self.bpm0_name = bpm0_name
+        self.bpm1_name = bpm1_name
+        
+    def getBPMs01(self):
+        return (self.bpm0_name,self.bpm1_name)
+        
+    def setBPM_DifferenceArr(self,x_arr,y_arr):
+        #-----self.bpm_phase_diff_arr[cav_phase_ind] = [cav_phase,bpm_phase_diff] for bpm0 and bpm1
+        self.bpm_phase_diff_arr = []
+        for cav_phase_ind in range(len(x_arr)):
+            self.bpm_phase_diff_arr.append([x_arr[cav_phase_ind],y_arr[cav_phase_ind]])
+            
+    def getBPM_DifferenceArr(self):
+        #-----self.bpm_phase_diff_arr[cav_phase_ind] = [cav_phase,bpm_phase_diff] for bpm0 and bpm1
+        return self.bpm_phase_diff_arr
 
     def EPICS_Phase(self,cav_epics_phase = None):
         """ Sets / gets EPICS phase of the cavity in deg. """

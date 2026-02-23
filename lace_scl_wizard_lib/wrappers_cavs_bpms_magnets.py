@@ -35,6 +35,8 @@ class Cavity_Wrapper:
         #---- Phase difference between phases bpm_wrapper1 and bpm_wrapper0 
         #---- vs. cavity phase
         self.phaseDiffBPM01_func = Function()
+        #---- Function eKin_Out ( cavity phase) for analysis
+        self.eKin_out_func = Function()
         #--- use or not in phase scan analysis: self.bpm_wrappers_useInPhaseAnalysis[bpm_wrapper,]
         self.bpm_wrappers_useInPhaseAnalysis = []
         for bpm_wrapper in self.bpm_wrappers:

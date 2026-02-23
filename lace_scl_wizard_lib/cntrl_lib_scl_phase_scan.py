@@ -751,19 +751,19 @@ class CavsScanDataTableModel(LACE_DataTableModel):
             self._updateBoolItem(cav_wrapper.isMeasured,self.item(cav_ind,2))
             bpm1_item = self.item(cav_ind,3)
             if(cav_wrapper.bpm_wrapper0 != None):
-                bpm1_item.setText("%10s"%cav_wrapper.bpm_wrapper0.bpm.getName())
+                bpm1_item.setText("%10s"%cav_wrapper.bpm_wrapper0.getAlias())
             else:
                  bpm1_item.setText("")
             bpm2_item = self.item(cav_ind,4)
             if(cav_wrapper.bpm_wrapper1 != None):
-                bpm2_item.setText("%10s"%cav_wrapper.bpm_wrapper1.bpm.getName())
+                bpm2_item.setText("%10s"%cav_wrapper.bpm_wrapper1.getAlias())
             else:
                  bpm2_item.setText("")
             epics_phase_old_item = self.item(cav_ind,5) ; epics_phase_old_item.setText("%+6.1f"%cav_wrapper.epicsPhaseInit)
             epics_phase_new_item = self.item(cav_ind,6) ; epics_phase_new_item.setText("%+6.1f"%cav_wrapper.epicsPhase)
-            scan_phase_sinAmp_item = self.item(cav_ind,7) ; scan_phase_sinAmp_item.setText("%6.1f"%(cav_wrapper.sin_phase_func_amp))
-            scan_phase_errAmp_item = self.item(cav_ind,8) ; scan_phase_errAmp_item.setText("%5.1f"%(cav_wrapper.sin_phase_func_amp_err))
-            synch_phase_item = self.item(cav_ind,9) ;synch_phase_item.setText("%+6.1f"%(cav_wrapper.synch_acc_phase))
+            scan_phase_sinAmp_item = self.item(cav_ind,7) ; scan_phase_sinAmp_item.setText("%6.1f"%cav_wrapper.sin_phase_func_amp)
+            scan_phase_errAmp_item = self.item(cav_ind,8) ; scan_phase_errAmp_item.setText("%5.1f"%cav_wrapper.sin_phase_func_amp_err)      
+            synch_phase_item = self.item(cav_ind,9) ; synch_phase_item.setText("%+6.1f"%cav_wrapper.synch_acc_phase)
 
 class BPMsForAnalysisTableModel(LACE_DataTableModel):
     def __init__(self,cavs_scan_cntrl):
