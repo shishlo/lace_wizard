@@ -348,7 +348,9 @@ class InitCavs_Action:
         phase_vals = [bpm_phase_pv.get() for bpm_phase_pv in bpm_phase_pvs]        
         for bpm_ind,bpm_wrapper in enumerate(bpm_wrappers):
             if(not bpm_wrapper.isGood): continue
-            if(math.isnan(amp_vals[bpm_ind]) or math.isnan(phase_vals[bpm_ind])):
+            if( (amp_vals[bpm_ind] is None) or (phase_vals[bpm_ind] is None) \
+                or (math.isnan(amp_vals[bpm_ind])) or \
+                (math.isnan(phase_vals[bpm_ind]))):
                 bpm_wrapper.isGood = False
         self.cavs_data_table_model.tableChanged()
         self.bpms_data_table_model.tableChanged()
