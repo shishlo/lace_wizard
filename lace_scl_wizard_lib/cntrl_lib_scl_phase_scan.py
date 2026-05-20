@@ -94,6 +94,10 @@ class Cavs_Scan_Cntrl:
         self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.cavs_table_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.cavs_table_view.selectionModel().selectionChanged.connect(self.cavsSelectionChanged)
+        
+        #--- connection to cav_table_view in the 
+        init_cavs_table_model = self.lace_scl_wizard.init_state_cntrl.cavs_data_table_model
+        init_cavs_table_model.addDependentTableModel(self.cavs_data_table_model)
 
         #---- BPMs that will be used for analysis
         self.bpms_table_view = LACE_QTableView()
