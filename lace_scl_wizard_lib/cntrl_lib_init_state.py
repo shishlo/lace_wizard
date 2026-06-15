@@ -202,6 +202,7 @@ class CavsDataTableModel(LACE_DataTableModel):
             col = item.column()
             if(col != 2): return
             self.cav_wrappers[item.row()].isGood = self._getValueOfBoolItem(item)
+            self.updateDependentTables()
 
     def _updateItemsFromData(self):
         for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):             
@@ -591,8 +592,6 @@ class InitState_Cntrl:
         self.cavs_table_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         #self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        
-        self.bpms_data_table_model.addDependentTableModel(self.cavs_data_table_model)
 
         #---- upper buttons panel
         buttons_style = StyleSheetFactory.pushButtonStyleSheet()
@@ -689,6 +688,9 @@ class InitState_Cntrl:
         self.bpms_params_table_view.setModel(self.bpms_params_table_model)
         #self.bpms_params_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         self.bpms_params_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        
+        #---- add dependency to the bpms_data_table_model
+        self.bpms_data_table_model.addDependentTableModel(self.bpms_params_table_model)
         
         #---- OEDA stands for Off Energy Delay Adjustment
         bpmReadPhaseOffset_button = QPushButton(text="Read BPMs' Phase Offsets",parent=None)        

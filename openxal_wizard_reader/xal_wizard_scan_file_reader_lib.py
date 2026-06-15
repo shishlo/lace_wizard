@@ -86,6 +86,7 @@ class XALtoSCL_TuneWizardUpdater:
                     bpm_phase = bpm_phase_arr[cav_phase_ind]
                     ampFunc.add(cav_phase,bpm_amp)
                     phaseFunc.add(cav_phase,bpm_phase)
+                #print ("debug cav_wrapper=",cav_wrapper.getAlias()," bpm=",bpm_wrapper.getAlias()," len(phases)=",phaseFunc.getSize())
             #---- fill out 
             bpm_diff_arr = xal_cavity_wrapper.getBPM_DifferenceArr()
             cav_wrapper.phaseDiffBPM01_func.clean()

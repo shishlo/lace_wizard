@@ -95,7 +95,7 @@ class Cavs_Scan_Cntrl:
         self.cavs_table_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
         self.cavs_table_view.selectionModel().selectionChanged.connect(self.cavsSelectionChanged)
         
-        #--- connection to cav_table_view in the 
+        #--- connection to cav_table_view in the initial state controller
         init_cavs_table_model = self.lace_scl_wizard.init_state_cntrl.cavs_data_table_model
         init_cavs_table_model.addDependentTableModel(self.cavs_data_table_model)
 
