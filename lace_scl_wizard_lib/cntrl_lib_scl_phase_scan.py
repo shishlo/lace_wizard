@@ -428,11 +428,16 @@ class StartScan_Action:
         
     def performAction(self):
         self.cavs_scan_cntrl = self.upper_panel_cntrl.cavs_scan_cntrl
+        cav_selection_model = self.cavs_scan_cntrl.cavs_table_view.selectionModel()
+        QModelIndex_list = cav_selection_model.selectedIndexes()
+        row = 0
+        if(len(QModelIndex_list) > 0):
+            row = QModelIndex_list[0].row()
         #---- We cannot start a second scan -------
         scan_stopper = self.cavs_scan_cntrl.scan_stopper
         if(scan_stopper.getIsRunning()): return
         #------------------------------------------
-        cav_wrappers = self.cavs_scan_cntrl.cav_wrappers
+        cav_wrappers = self.cavs_scan_cntrl.cav_wrappers[row:]
         self._performAction(cav_wrappers)
         print ("debug Starts the phase scans for all cavities. ")
 
