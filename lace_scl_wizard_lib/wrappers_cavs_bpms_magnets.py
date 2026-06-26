@@ -33,8 +33,9 @@ class Cavity_Wrapper:
         self.bpm_amp_phase_entrance_funcions = (Function(),Function())
         #---------------------------------------------------------------------
         #---- Phase difference between phases bpm_wrapper1 and bpm_wrapper0 
-        #---- vs. cavity phase
+        #---- vs. cavity phase - measured and 1st harmonic fitting
         self.phaseDiffBPM01_func = Function()
+        self.phaseDiffBPM01_fit_func = Function()
         #---- Function eKin_Out ( cavity phase) for analysis
         self.eKin_out_func = Function()
         #--- use or not in phase scan analysis: self.bpm_wrappers_useInPhaseAnalysis[bpm_wrapper,]

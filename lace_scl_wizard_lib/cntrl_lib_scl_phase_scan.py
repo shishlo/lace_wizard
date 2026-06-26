@@ -257,7 +257,8 @@ class Cavs_Scan_Cntrl:
         bpm_phase_diff_plot.getAxis('left').setTextPen('white')
         bpm_phase_diff_plot.getAxis('bottom').setTextPen('white')
         #---- Now these data will be shown on the plot
-        bpm_phase_diff_line = bpm_phase_diff_plot.plot(pen='white', linestyle="-", symbol="o", symbolBrush='r',marker_size=5, name=html.unescape("&Delta; &phi;<sub>12</sub>"))
+        #bpm_phase_diff_line = bpm_phase_diff_plot.plot(pen='white', linestyle="-", symbol="o", symbolBrush='r',marker_size=5, name=html.unescape("&Delta; &phi;<sub>12</sub>"))
+        bpm_phase_diff_line = bpm_phase_diff_plot.plot(pen=None, symbol="o", symbolSize=5, symbolBrush='r', name=html.unescape("&Delta; &phi;<sub>12</sub>"))     
         return bpm_phase_diff_line
     
     def setupBPM_PhaseAmpPlots(self):

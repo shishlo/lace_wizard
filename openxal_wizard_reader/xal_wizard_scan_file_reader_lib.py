@@ -50,6 +50,8 @@ class XALtoSCL_TuneWizardUpdater:
             cav_wrapper.epicsPhase = xal_cavity_wrapper.EPICS_Phase()
             cav_wrapper.epicsAmpInit = xal_cavity_wrapper.EPICS_Amp()
             cav_wrapper.epicsPhaseInit =  xal_cavity_wrapper.EPICS_Phase()
+            cav_wrapper.sin_phase_func_amp = xal_cavity_wrapper.sinPhaseScanAmp()
+            cav_wrapper.sin_phase_func_amp_err = xal_cavity_wrapper.sinPhaseScanAmpErr()
             cav_wrapper.bpm_wrapper0 = self.getBPM_Wrapper(bpm0_name)
             cav_wrapper.bpm_wrapper1 = self.getBPM_Wrapper(bpm1_name)
             #print ("debug cav=",cav_wrapper.getAlias()," bpm 0,1 =", (bpm0_name,bpm1_name))
@@ -87,11 +89,16 @@ class XALtoSCL_TuneWizardUpdater:
                     ampFunc.add(cav_phase,bpm_amp)
                     phaseFunc.add(cav_phase,bpm_phase)
                 #print ("debug cav_wrapper=",cav_wrapper.getAlias()," bpm=",bpm_wrapper.getAlias()," len(phases)=",phaseFunc.getSize())
-            #---- fill out 
+            #---- fill out BPM 0 and 1 phases difference Function from array from xal_cavity_wrapper
             bpm_diff_arr = xal_cavity_wrapper.getBPM_DifferenceArr()
             cav_wrapper.phaseDiffBPM01_func.clean()
             for [cav_phase,bpm_diff_phase] in bpm_diff_arr:
                 cav_wrapper.phaseDiffBPM01_func.add(cav_phase,bpm_diff_phase)
+            #---- fill out BPM 0 and 1 phases difference Function from array from xal_cavity_wrapper
+            bpm_diff_fit_arr = xal_cavity_wrapper.getBPM_DifferenceFitArr()
+            cav_wrapper.phaseDiffBPM01_fit_func.clean()
+            for [cav_phase,bpm_diff_phase_fit] in bpm_diff_fit_arr:
+                cav_wrapper.phaseDiffBPM01_fit_func.add(cav_phase,bpm_diff_phase_fit)                
         #----------------------------------
         self.lace_scl_wizard.init_state_cntrl.cavs_data_table_model.tableChanged()
         self.lace_scl_wizard.cavs_phase_scan_cntrl.cavs_scan_cntrl.cavs_data_table_model.tableChanged()
@@ -200,6 +207,8 @@ class SCL_Wizard_File_Reader:
             cav_xal_model_phase = params_da.doubleValue("designPhase")
             goal_synch_phase = params_da.doubleValue("scanPhaseShift")
             real_synch_phase = params_da.doubleValue("real_scanPhaseShift")
+            phase_scan_harm_amp = params_da.doubleValue("phase_scan_harm_amp")
+            phase_scan_harm_amp_err = params_da.doubleValue("phase_scan_harm_err")
             eKin_in = params_da.doubleValue("eKin_in")
             eKin_out = params_da.doubleValue("bpm_eKin_out")
             cav_name = cav_scan_da.stringValue("cav")
@@ -209,6 +218,9 @@ class SCL_Wizard_File_Reader:
             bpm_phase_diff_da = cav_scan_da.childAdaptors("Phase_Diff_GD")[0]
             bpm_phase_diff_x_arr = [float(st) for st in bpm_phase_diff_da.childAdaptors("x")[0].stringValue("arr").split()]
             bpm_phase_diff_y_arr = [float(st) for st in bpm_phase_diff_da.childAdaptors("y")[0].stringValue("arr").split()]
+            bpm_phase_diff_fit_da = cav_scan_da.childAdaptors("Phase_Diff_Fit_GD")[0]
+            bpm_phase_diff_x_fit_arr = [float(st) for st in bpm_phase_diff_fit_da.childAdaptors("x")[0].stringValue("arr").split()]
+            bpm_phase_diff_y_fit_arr = [float(st) for st in bpm_phase_diff_fit_da.childAdaptors("y")[0].stringValue("arr").split()]            
             #----------------------------------------------------------------------
             xal_cav_wrapper = XAL_CavityScanDataWrapper(cav_name)
             xal_cav_wrapper.isGood(cav_is_good)
@@ -219,6 +231,8 @@ class SCL_Wizard_File_Reader:
             xal_cav_wrapper.XAL_Model_Phase(cav_xal_model_phase)
             xal_cav_wrapper.goalSynchPhase(goal_synch_phase)
             xal_cav_wrapper.realSynchPhase(real_synch_phase)
+            xal_cav_wrapper.sinPhaseScanAmp(phase_scan_harm_amp)
+            xal_cav_wrapper.sinPhaseScanAmpErr(phase_scan_harm_amp_err)
             xal_cav_wrapper.eKin_In(eKin_in)
             xal_cav_wrapper.eKin_Out(eKin_out)
             #---- eKinOut list from bpm data analysis
@@ -286,6 +300,7 @@ class SCL_Wizard_File_Reader:
                 if(cav_name == "SCL_RF:Cav01a" and bpm_name == "SCL_Diag:BPM05"): sys.exit(0)
                 """
             xal_cav_wrapper.setBPM_DifferenceArr(bpm_phase_diff_x_arr,bpm_phase_diff_y_arr)
+            xal_cav_wrapper.setBPM_DifferenceFitArr(bpm_phase_diff_x_fit_arr,bpm_phase_diff_y_fit_arr)
             #-----------------------------------------------
             xal_cavity_wrapper_dict[cav_name.replace("_RF","")] = xal_cav_wrapper
         #-----------------------------------------------
@@ -328,13 +343,17 @@ class XAL_CavityScanDataWrapper(NamedObject):
         self.bpm0_name = "None"
         self.bpm1_name = "None"
         #-----self.bpm_phase_diff_arr[cav_phase_ind] = [cav_phase,bpm_phase_diff] for bpm0 and bpm1
+        #-----self.bpm_phase_diff_fit_arr[cav_phase_ind] = [cav_phase,bpm_phase_diff_fit] for bpm0 and bpm1
         self.bpm_phase_diff_arr = []
+        self.bpm_phase_diff_fit_arr = []
         self.bpm_data_dict = {}
         self.cav_epics_phase = 0.
         self.cav_epics_amp = 0.
         self.cav_xal_model_amp = 0.
         self.goal_synch_phase = 0.
         self.real_synch_phase = 0.
+        self.phase_scan_harm_amp = 0.
+        self.phase_scan_harm_amp_err = 0.
         self.eKin_out = 0.
         self.eKin_in = 0.
         #---- eKin_out list from BPMs phase analysis in SCL Wizard
@@ -345,12 +364,16 @@ class XAL_CavityScanDataWrapper(NamedObject):
         """ Removes all data"""
         self.is_good = False
         self.bpm0_name = "None"
-        self.bpm1_name = "None"        
+        self.bpm1_name = "None" 
+        self.bpm_phase_diff_arr.clear()
+        self.bpm_phase_diff_fit_arr.clear()
         self.bpm_data_dict = {}
         self.cav_epics_phase = 0.
         self.cav_epics_amp = 0.
         self.goal_synch_phase = 0.
         self.real_synch_phase = 0.
+        self.phase_scan_harm_amp = 0.
+        self.phase_scan_harm_amp_err = 0.
         self.eKin_out = 0.
         self.eKin_in = 0.
         #---- eKin_out list from BPMs phase analysis in SCL Wizard
@@ -375,9 +398,19 @@ class XAL_CavityScanDataWrapper(NamedObject):
         for cav_phase_ind in range(len(x_arr)):
             self.bpm_phase_diff_arr.append([x_arr[cav_phase_ind],y_arr[cav_phase_ind]])
             
+    def setBPM_DifferenceFitArr(self,x_arr,y_arr):
+        #-----self.bpm_phase_diff_fit_arr[cav_phase_ind] = [cav_phase,bpm_phase_diff_fit] for bpm0 and bpm1
+        self.bpm_phase_diff_fit_arr = []
+        for cav_phase_ind in range(len(x_arr)):
+            self.bpm_phase_diff_fit_arr.append([x_arr[cav_phase_ind],y_arr[cav_phase_ind]])
+
     def getBPM_DifferenceArr(self):
         #-----self.bpm_phase_diff_arr[cav_phase_ind] = [cav_phase,bpm_phase_diff] for bpm0 and bpm1
         return self.bpm_phase_diff_arr
+        
+    def getBPM_DifferenceFitArr(self):
+        #-----self.bpm_phase_diff_fit_arr[cav_phase_ind] = [cav_phase,bpm_phase_diff_fit] for bpm0 and bpm1
+        return self.bpm_phase_diff_fit_arr
 
     def EPICS_Phase(self,cav_epics_phase = None):
         """ Sets / gets EPICS phase of the cavity in deg. """
@@ -414,6 +447,24 @@ class XAL_CavityScanDataWrapper(NamedObject):
         if(real_synch_phase == None): return self.real_synch_phase
         self.real_synch_phase = real_synch_phase
         return self.real_synch_phase
+        
+    def sinPhaseScanAmp(self, phase_scan_harm_amp = None):
+        """ 
+        Sets / gets the 1st harmonic phase scan amplitude for difference of
+        BPMs phases vs. cavity's phases
+        """
+        if(phase_scan_harm_amp == None): return self.phase_scan_harm_amp
+        self.phase_scan_harm_amp = phase_scan_harm_amp
+        return self.phase_scan_harm_amp
+        
+    def sinPhaseScanAmpErr(self, phase_scan_harm_amp_err = None):
+        """ 
+        Sets / gets the error between measured values and fitting using the 1st 
+        harmonic for difference of BPMs phases vs. cavity's phases
+        """
+        if(phase_scan_harm_amp_err == None): return self.phase_scan_harm_amp_err
+        self.phase_scan_harm_amp_err = phase_scan_harm_amp_err
+        return self.phase_scan_harm_amp_err
         
     def eKin_In(self,eKin_in = None):
         """ Sets / gets the energy before cavity """
