@@ -153,6 +153,7 @@ class BunchDiagnosticNode(BaseLinacNode):
         #---- BPM phase offset relative to EPICS value 
         #---- model epics_bpm_phase = model_phase + bpm_phase_offset
         self.bpm_phase_offset = 0.
+        self.bpm_phase_offset_err = 0.
         #---- phase shift for the bunch as whole from synch. particle
         self.delta_phase = 0.
      
@@ -347,6 +348,7 @@ class ModelBPM(BunchDiagnosticNode):
         #---- bpm is a usual linac lattice marker
         self.bpm = bpm
         self.bpm_phase_offset = 0.
+        self.bpm_phase_offset_err = 0.
 
     def getBPM(self):
         """ Returns PyORBIT BPM node - marker """
@@ -356,9 +358,17 @@ class ModelBPM(BunchDiagnosticNode):
         """ Sets BPM EPICS phase offset value """
         self.bpm_phase_offset = bpm_phase_offset
         
+    def setEPICS_PhaseOffsetErr(self,bpm_phase_offset_err):
+        """ Sets BPM EPICS phase offset error """
+        self.bpm_phase_offset_err = bpm_phase_offset_err   
+        
     def getEPICS_PhaseOffset(self):
         """ Returns BPM EPICS phase offset value """
         return self.bpm_phase_offset
+        
+    def getEPICS_PhaseOffsetErr(self):
+        """ Returns BPM EPICS phase offset error """
+        return self.bpm_phase_offset_err      
         
     def getModelEpicsPhase(self):
         """

@@ -238,7 +238,7 @@ class BPMsDataTableModel(LACE_DataTableModel):
         self.bpm_state_cntrl = self.init_state_cntrl.bpms_state_cntrl
         self.bpm_wrappers = self.bpm_state_cntrl.getBPM_Wrappers()
         #---- Sets the headers
-        headers = ["BPM", "Pos.[m]","Good","Phase Offset"]  
+        headers = ["BPM", "Pos.[m]","Good",html.unescape("&phi;-Offset")]  
         self.setHorizontalHeaderLabels(headers)
         for bpm_ind,bpm_wrapper in enumerate(self.bpm_wrappers):
             bpm_name_item = QStandardItem(bpm_wrapper.getAlias())
@@ -278,7 +278,10 @@ class BPMsParamsTableModel(LACE_DataTableModel):
         self.bpm_wrappers = self.bpm_state_cntrl.getBPM_Wrappers()
         #---- Sets the headers
         #---- OEDA stands for Off Energy Delay Adjustment
-        headers = ["BPM", "Pos.[m]","Good","Phase Offset","OEDA Time [ms]"]  
+        headers = ["BPM", "Pos.[m]","Good",\
+                   html.unescape("&phi;-Offset"),\
+                   html.unescape("&phi;-Offset Err"),\
+                   "OEDA Time [ms]"]  
         self.setHorizontalHeaderLabels(headers)
         for bpm_ind,bpm_wrapper in enumerate(self.bpm_wrappers):
             bpm_name_item = QStandardItem(bpm_wrapper.getAlias())
@@ -286,6 +289,7 @@ class BPMsParamsTableModel(LACE_DataTableModel):
             bpm_good_item = QStandardItem()
             bpm_good_item.setCheckable(True)
             bpm_phase_offset_item = QStandardItem("0.")
+            bpm_phase_offset_err_item = QStandardItem("0.")
             bpm_oeda_item = QStandardItem("0.")
             if(bpm_wrapper.isGood):
                 bpm_good_item.setCheckState(Qt.Checked)
@@ -294,8 +298,10 @@ class BPMsParamsTableModel(LACE_DataTableModel):
             bpm_name_item.setEditable(False)
             bpm_pos_item.setEditable(False)
             bpm_phase_offset_item.setEditable(False)
+            bpm_phase_offset_err_item.setEditable(False)
             bpm_oeda_item.setEditable(False)
-            row = [bpm_name_item,bpm_pos_item,bpm_good_item,bpm_phase_offset_item,bpm_oeda_item]
+            row  = [bpm_name_item,bpm_pos_item,bpm_good_item]
+            row += [bpm_phase_offset_item,bpm_phase_offset_err_item,bpm_oeda_item]
             self.appendRow(row)
         self.itemChanged.connect(self.handleItemChanged)    
             
@@ -308,7 +314,9 @@ class BPMsParamsTableModel(LACE_DataTableModel):
     def _updateItemsFromData(self):
         for bpm_ind,bpm_wrapper in enumerate(self.bpm_wrappers):
             item = self.item(bpm_ind,2); self._updateBoolItem(bpm_wrapper.isGood,item)
-            item = self.item(bpm_ind,3); item.setText("%+6.3f"%bpm_wrapper.getOEDA_EPICS_TimeShift())
+            item = self.item(bpm_ind,3); item.setText("%+6.3f"%bpm_wrapper.getPhaseOffset())
+            item = self.item(bpm_ind,4); item.setText("%+6.3f"%bpm_wrapper.getPhaseOffsetErr())
+            item = self.item(bpm_ind,5); item.setText("%+6.3f"%bpm_wrapper.getOEDA_EPICS_TimeShift())
         
 #----------------------------------------------------------
 # Actions on events with buttons 

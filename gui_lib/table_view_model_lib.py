@@ -20,7 +20,8 @@ class LACE_QTableView(QTableView):
     def showEvent(self, event):
         """Runs automatically when the window is shown."""
         super().showEvent(event)
-        #self.model().tableChanged()
+        #print ("debug  showEvent LACE_QTableView=",self)
+        self.model().tableChanged()
         
 class LACE_DataTableModel(QStandardItemModel):
     def __init__(self):

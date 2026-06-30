@@ -217,9 +217,15 @@ class BPM_Wrapper:
 
     def getPhaseOffset(self):
         return self.model_bpm.getEPICS_PhaseOffset()
+       
+    def getPhaseOffsetErr(self):
+        return self.model_bpm.getEPICS_PhaseOffsetErr()
         
     def setPhaseOffset(self,bpm_phase_offset):
         return self.model_bpm.setEPICS_PhaseOffset(bpm_phase_offset)
+        
+    def setPhaseOffsetErr(self,bpm_phase_offset_err):
+        return self.model_bpm.setEPICS_PhaseOffsetErr(bpm_phase_offset_err)    
         
     def getModelBPM(self):
         return self.model_bpm

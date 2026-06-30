@@ -35,8 +35,11 @@ class XALtoSCL_TuneWizardUpdater:
         self.scl_scan_reader = SCL_Wizard_File_Reader()
         self.scl_scan_reader.readSCL_WizardXML(file_name)
         print ("degug file name=",file_name)
+        #-----------------------------------------------------------------
+        #---- Updates all cavities scan data -----------------------------
         #---- get initial energy from the the exit of the previous cavity
         #---- The out energy of the cavity is defined by BPMs data
+        #-----------------------------------------------------------------
         cav_wrappers = self.lace_scl_wizard.getCavWrappers()
         for cav_wrapper in cav_wrappers:
             xal_cavity_wrapper = self.scl_scan_reader.getXAL_CavityWrapperDict()["SCL:"+cav_wrapper.getAlias()]
@@ -99,7 +102,30 @@ class XALtoSCL_TuneWizardUpdater:
             cav_wrapper.phaseDiffBPM01_fit_func.clean()
             for [cav_phase,bpm_diff_phase_fit] in bpm_diff_fit_arr:
                 cav_wrapper.phaseDiffBPM01_fit_func.add(cav_phase,bpm_diff_phase_fit)                
-        #----------------------------------
+        #-------------------------------------------------------------------
+        #---- Updates all BPMs parameters data -----------------------------
+        #-------------------------------------------------------------------
+        bpm_wrappers = self.lace_scl_wizard.getBPM_Wrappers()
+        for bpm_wrapper in bpm_wrappers:
+            bpm_alias = bpm_wrapper.getAlias()
+            xal_bpm_wrapper_dict = self.scl_scan_reader.getXAL_BPM_WrapperDict()
+            if(bpm_alias in xal_bpm_wrapper_dict):
+                xal_bpm_wrapper = self.scl_scan_reader.getXAL_BPM_WrapperDict()[bpm_wrapper.getAlias()]
+                xal_pos = xal_bpm_wrapper.getPosition()
+                xal_isGood = xal_bpm_wrapper.isGood()
+                xal_phaseOffset = xal_bpm_wrapper.phaseOffset()
+                xal_phaseOffsetErr = xal_bpm_wrapper.phaseOffsetErr()
+                xal_oeda_time_shift = xal_bpm_wrapper.OEDA_TimeShift()
+                bpm_wrapper.isGood = xal_isGood
+                bpm_wrapper.setPhaseOffset(xal_phaseOffset)
+                bpm_wrapper.setPhaseOffsetErr(xal_phaseOffsetErr)
+                bpm_wrapper.setOEDA_EPICS_TimeShift(xal_oeda_time_shift)
+            else:
+                bpm_wrapper.isGood = False
+                bpm_wrapper.setPhaseOffset(0.)
+                bpm_wrapper.setPhaseOffsetErr(0.)
+                bpm_wrapper.setOEDA_EPICS_TimeShift(0.)
+        #-------------------------------------------------------------------
         self.lace_scl_wizard.init_state_cntrl.cavs_data_table_model.tableChanged()
         self.lace_scl_wizard.cavs_phase_scan_cntrl.cavs_scan_cntrl.cavs_data_table_model.tableChanged()
         
@@ -115,6 +141,7 @@ class SCL_Wizard_File_Reader:
     """
     def __init__(self):
         self.cavs_scans_da = XmlDataAdaptor("empty")
+        self.bpms_params_da = XmlDataAdaptor("empty")
         self.scl_wizard_da = XmlDataAdaptor("empty")
         self.scl_wizard_file_name = ""
         self.xal_cavity_wrapper_dict = {}
@@ -130,6 +157,10 @@ class SCL_Wizard_File_Reader:
         """ Returns the XmlDataAdaptor with cavities scan data """
         return self.cavs_scans_da 
         
+    def getBPM_ParamsDA(self):
+        """ Returns the XmlDataAdaptor with BPMs paremeters data """
+        return self.bpms_params_da
+        
     def getSCL_WizardDA(self):
         """ Returns the XmlDataAdaptor for the whole SCL Wizard """
         return self.scl_wizard_da
@@ -140,6 +171,7 @@ class SCL_Wizard_File_Reader:
         Returns the XmlDataAdaptor with cavities scan data.
         """
         self.cavs_scans_da = XmlDataAdaptor("empty")
+        self.bpms_params_da = XmlDataAdaptor("empty")
         self.scl_wizard_da = XmlDataAdaptor("empty")
         self.scl_wizard_file_name = ""
         fl_in = open(xml_file_name,"r")
@@ -159,8 +191,9 @@ class SCL_Wizard_File_Reader:
         self.scl_wizard_da = XmlDataAdaptor.adaptorForString(txt)
         self._cleanNameSpaces(self.scl_wizard_da)
         #----------------------------
-        self.cavs_scans_da = self._getSCL_Scans_DA()
+        (self.cavs_scans_da, self.bpms_params_da) = self._getSCL_Scans_DA()
         self.createXAL_CavityWrapperDict()
+        self.createXAL_BPM_WrapperDict()
         self.createXAL_QuadFieldDict()
         return self.scl_wizard_da
         
@@ -168,7 +201,8 @@ class SCL_Wizard_File_Reader:
         """ Extracts scan data from the whole DA """
         scl_tuneup_data_da = self.scl_wizard_da.childAdaptors("SCL_Longitudinal_Tuneup_Data")[0]
         cavs_scans_da = scl_tuneup_data_da.childAdaptors("Cavs_Parameters_and_Data")[0]
-        return cavs_scans_da 
+        bpms_params_da = scl_tuneup_data_da.childAdaptors("BPMs_Parameters_and_Data")[0]
+        return (cavs_scans_da,bpms_params_da)
 
     def _cleanNameSpaces(self,child_in_da):
         """
@@ -305,11 +339,40 @@ class SCL_Wizard_File_Reader:
             xal_cavity_wrapper_dict[cav_name.replace("_RF","")] = xal_cav_wrapper
         #-----------------------------------------------
         self.xal_cavity_wrapper_dict = xal_cavity_wrapper_dict 
-        return xal_cavity_wrapper_dict
+        return self.xal_cavity_wrapper_dict
+        
+    def createXAL_BPM_WrapperDict(self):
+        """ Creates the dictionary of the BPMs' XAL Wrappers """
+        xal_bpm_wrapper_dict = {}
+        bpms_params_da = self.getBPM_ParamsDA()
+        for bpm_params_da in bpms_params_da.childAdaptors():
+            bpm_name = bpm_params_da.getName()
+            alias = bpm_params_da.stringValue("alias")
+            pos = bpm_params_da.doubleValue("pos")
+            is_good = bpm_params_da.booleanValue("isGood")
+            phase_offset_da = bpm_params_da.childAdaptors("final_phase_offset")[0]
+            phase_offset = phase_offset_da.doubleValue("phaseOffset_avg")
+            phase_offset_err = phase_offset_da.doubleValue("phaseOffset_err")
+            oeda_time_shift_da = bpm_params_da.childAdaptors("BPM_Timing_Shift")[0]
+            oeda_time_shift = oeda_time_shift_da.doubleValue("prod_time_shift")
+            #-------------------------------
+            xal_bpm_wrapper = XAL_BPM_DataWrapper(bpm_name,alias)
+            xal_bpm_wrapper.setPosition(pos)
+            xal_bpm_wrapper.isGood(is_good)
+            xal_bpm_wrapper.phaseOffset(phase_offset)
+            xal_bpm_wrapper.phaseOffsetErr(phase_offset_err)
+            xal_bpm_wrapper.OEDA_TimeShift(oeda_time_shift)
+            xal_bpm_wrapper_dict[alias] = xal_bpm_wrapper
+        self.xal_bpm_wrapper_dict = xal_bpm_wrapper_dict
+        return self.xal_bpm_wrapper_dict
         
     def getXAL_CavityWrapperDict(self):
-        """ Returns a dictionary with cavity wrappers classes """
+        """ Returns a dictionary with XAL cavity wrappers classes """
         return self.xal_cavity_wrapper_dict
+        
+    def getXAL_BPM_WrapperDict(self):
+        """ Returns a dictionary with XAL BPM wrappers classes """
+        return self.xal_bpm_wrapper_dict
         
     def createXAL_QuadFieldDict(self):
         """ Creates a dictionary for quadrupole fileds in SCL and HEBT1 """
@@ -527,4 +590,86 @@ class XAL_CavityScanDataWrapper(NamedObject):
         
     def getBPM_Y_Arr(self,bpm_name):
         if(not (bpm_name in self.bpm_data_dict)): return []
-        return self.bpm_data_dict[bpm_name][4]  
+        return self.bpm_data_dict[bpm_name][4]
+
+class XAL_BPM_DataWrapper(NamedObject):
+    """
+    Keeps BPM's data:
+    alias (e.g. SCL:BPM01 instead of name SCL_Diag:BPM01)
+    position; 
+    state=good/bad; 
+    phase offset and its error;
+    OEDA time shift
+    """
+    def __init__(self, xal_bpm_name, alias):
+        NamedObject.__init__(self, xal_bpm_name)
+        self.alias = alias
+        self.xal_position = 0.
+        self.is_good = False
+        self.phase_offset = 0.
+        self.phase_offset_err = 0.
+        self.oeda_time_shift = 0.
+        
+    def clear(self):
+        """ Removes all data"""
+        self.is_good = False
+        self.xal_position = 0.
+        self.is_good = False
+        self.phase_offset = 0.
+        self.phase_offset_err = 0.
+        self.oeda_time_shift = 0.
+        
+    def getAlias(self):
+        """
+        Returns alias (e.g. SCL:BPM01 instead of name SCL_Diag:BPM01)
+        """
+        return self.alias 
+        
+    def getPosition(self):
+        """ Returns the position of BPM from XAL SCL Wizard file """
+        return self.xal_position
+
+    def setPosition(self,xal_position):
+        """ Sets the position of BPM in XAL SCL Wizard file """
+        self.xal_position = xal_position
+        return self.xal_position
+        
+    def isGood(self,is_good = None):
+        """ 
+        Returns/Sets the is_good parameters 
+        of BPM in XAL SCL Wizard file 
+        """
+        if(is_good == None): return self.is_good
+        self.is_good = is_good
+        return self.is_good
+        
+    def phaseOffset(self,phase_offset = None):
+        """ 
+        Returns/Sets the phase_offset parameters
+        of BPM in XAL SCL Wizard file 
+        """
+        if(phase_offset == None): return self.phase_offset
+        self.phase_offset = phase_offset
+        return self.phase_offset
+        
+    def phaseOffsetErr(self,phase_offset_err = None):
+        """ 
+        Returns/Sets the phase_offset_err parameters
+        of BPM in XAL SCL Wizard file 
+        """
+        if(phase_offset_err == None): return self.phase_offset_err
+        self.phase_offset_err = phase_offset_err
+        return self.phase_offset_err        
+        
+    def OEDA_TimeShift(self,oeda_time_shift = None):
+        """ 
+        Returns/Sets the oeda_time_shift parameters 
+        of BPM in XAL SCL Wizard file
+        """
+        if(oeda_time_shift == None): return self.oeda_time_shift
+        self.oeda_time_shift = oeda_time_shift
+        return self.oeda_time_shift       
+
+
+        
+

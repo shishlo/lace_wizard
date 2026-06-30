@@ -141,7 +141,7 @@ class Cavs_Scan_Cntrl:
         main_layout.addWidget(self.bottom_panel_cntrl.getMainWidget(),1)
         
         #---- Set up plots. Plots themselves are belongs to self.bottom_panel_cntrl
-        self.bpm_phase_diff_line = self.getLineBPM_DiffPhaseScan()
+        self.bpm_phase_diff_line, self.bpm_phase_diff_fit_line = self.getLineAndFitBPM_DiffPhaseScan()
         self.setupBPM_PhaseAmpPlots()
         #---- lines Phase&Amp. vs Cav. Phase on the two bottom plots
         self.bpm_phase_amp_lines = []
@@ -190,6 +190,8 @@ class Cavs_Scan_Cntrl:
         self.bottom_panel_cntrl.bpmAmpPlot().setTitle(title)
         (x_arr,y_arr,y_err_arr) = cav_wrapper.phaseDiffBPM01_func.getXYErrLists()
         self.bpm_phase_diff_line.setData(x_arr,y_arr)
+        (x_arr,y_arr,y_err_arr) = cav_wrapper.phaseDiffBPM01_fit_func.getXYErrLists()
+        self.bpm_phase_diff_fit_line.setData(x_arr,y_arr)
         self.bpmsSelectionChanged(None,None)
     
     @Slot("QtCore.QItemSelection*")
@@ -229,8 +231,8 @@ class Cavs_Scan_Cntrl:
         bpm_amp_plot = self.bottom_panel_cntrl.bpmAmpPlot()
         bpm_phase_plot = self.bottom_panel_cntrl.bpmPhasePlot()
         bpm_alias = bpm_wrapper.getAlias()
-        bpm_amp_line = bpm_amp_plot.plot(pen='white', linestyle="-", symbol="o", symbolBrush=color,marker_size=3, name=html.unescape("Amp;<sub>"+bpm_alias+"</sub>"))
-        bpm_phase_line = bpm_phase_plot.plot(pen='white', linestyle="-", symbol="o", symbolBrush=color,marker_size=3, name=html.unescape("&phi;<sub>"+bpm_alias+"</sub>"))
+        bpm_amp_line = bpm_amp_plot.plot(pen='white', linestyle="-", symbol="o", symbolBrush=color,symbolSize=5, name=html.unescape("Amp;<sub>"+bpm_alias+"</sub>"))
+        bpm_phase_line = bpm_phase_plot.plot(pen='white', linestyle="-", symbol="o", symbolBrush=color,symbolSize=5, name=html.unescape("&phi;<sub>"+bpm_alias+"</sub>"))
         return (bpm_amp_line,bpm_phase_line)
         
         
@@ -242,7 +244,7 @@ class Cavs_Scan_Cntrl:
         """ Reads data for this controller from the Data Adaptor """
         return
 
-    def getLineBPM_DiffPhaseScan(self):
+    def getLineAndFitBPM_DiffPhaseScan(self):
         """ 
         Sets up parameters of PlotWidget instance and 
         adds plot of difference BPM12 phases vs. cavity phase 
@@ -258,8 +260,9 @@ class Cavs_Scan_Cntrl:
         bpm_phase_diff_plot.getAxis('bottom').setTextPen('white')
         #---- Now these data will be shown on the plot
         #bpm_phase_diff_line = bpm_phase_diff_plot.plot(pen='white', linestyle="-", symbol="o", symbolBrush='r',marker_size=5, name=html.unescape("&Delta; &phi;<sub>12</sub>"))
-        bpm_phase_diff_line = bpm_phase_diff_plot.plot(pen=None, symbol="o", symbolSize=5, symbolBrush='r', name=html.unescape("&Delta; &phi;<sub>12</sub>"))     
-        return bpm_phase_diff_line
+        bpm_phase_diff_line = bpm_phase_diff_plot.plot(pen=None, symbol="o", symbolSize=5, symbolBrush='r', name=html.unescape("&Delta; &phi;<sub>12</sub>"))
+        bpm_phase_diff_fit_line = bpm_phase_diff_plot.plot(pen="white",  linestyle="-", name=html.unescape("Fit &Delta; &phi;<sub>12</sub>"))        
+        return (bpm_phase_diff_line,bpm_phase_diff_fit_line)
     
     def setupBPM_PhaseAmpPlots(self):
         """ Adds plot data to the PlotWidget instance for bpm  amp. and phase vs. cav. phase """
@@ -296,6 +299,8 @@ class Cavs_Scan_Cntrl:
             cav_wrapper = rest[0]
             (x_arr,y_arr,y_err_arr) = cav_wrapper.phaseDiffBPM01_func.getXYErrLists()
             self.bpm_phase_diff_line.setData(x_arr,y_arr)
+            (x_arr,y_arr,y_err_arr) = cav_wrapper.phaseDiffBPM01_fit_func.getXYErrLists()
+            self.bpm_phase_diff_fit_line.setData(x_arr,y_arr)            
             self.bpmsSelectionChanged(None,None)
         #---- Type of message - Scan status update
         if(update_type == "table_selection_clear"):
