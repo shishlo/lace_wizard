@@ -24,7 +24,8 @@ from PySide6.QtWidgets import (
     QDoubleSpinBox,
     QLabel,
     QLineEdit,
-    QRadioButton
+    QRadioButton,
+    QButtonGroup
     )
 
 from PySide6.QtCore import (
@@ -529,19 +530,19 @@ class UpperScanPanelCntrl:
         self.max_sin_amp_err_spin_box.setSingleStep(0.5)  # Set step size for arrow buttons
         self.max_sin_amp_err_spin_box.setValue(4.0)       # Set default value
 
-        stat_for_in_enrg_label = QLabel(html.unescape("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Statistics for input E <sub>kin</sub>="))
+        stat_for_in_enrg_label = QLabel(html.unescape("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Statistics for E<sub>kin</sub>="))
         self.stat_for_in_enrg_spin_box = QDoubleSpinBox()
         self.stat_for_in_enrg_spin_box.setRange(1.,30.)    # Set min/max range
         self.stat_for_in_enrg_spin_box.setDecimals(0)      # Set precision to 2 decimal places
         self.stat_for_in_enrg_spin_box.setSingleStep(1)    # Set step size for arrow buttons
         self.stat_for_in_enrg_spin_box.setValue(3.0)       # Set default value
-
-        self.wrap_phase_button = QRadioButton("Wrap Phases")
-        self.wrap_phase_button.setChecked(True)
-        self.keep_phases_button = QRadioButton("Keep Cavs Phases")
-        self.keep_phases_button.setChecked(False)
-        self.eKin_measure_button = QRadioButton("Measure eKin")
-        self.eKin_measure_button.setChecked(False)   
+        
+        self.wrap_phase_checkbox = QCheckBox("Wrap Phases")
+        self.wrap_phase_checkbox.setChecked(True)
+        self.keep_phases_checkbox = QCheckBox("Keep Cavs Phases")
+        self.keep_phases_checkbox.setChecked(False)
+        self.eKin_measure_checkbox = QCheckBox("Measure eKin")
+        self.eKin_measure_checkbox.setChecked(False)  
 
         hor_layout_1.addWidget(setSynchPhase_button)
         hor_layout_1.addWidget(self.sync_phase_double_spin_box)
@@ -552,9 +553,9 @@ class UpperScanPanelCntrl:
         hor_layout_1.addWidget(stat_for_in_enrg_label)
         hor_layout_1.addWidget(self.stat_for_in_enrg_spin_box)
         hor_layout_1.addWidget(QLabel("   "))
-        hor_layout_1.addWidget(self.wrap_phase_button)
-        hor_layout_1.addWidget(self.keep_phases_button)
-        hor_layout_1.addWidget(self.eKin_measure_button)
+        hor_layout_1.addWidget(self.wrap_phase_checkbox)
+        hor_layout_1.addWidget(self.keep_phases_checkbox)
+        hor_layout_1.addWidget(self.eKin_measure_checkbox)   
 
         #----------------------------------------------
         #---- lower line - hor_view_2 panel
