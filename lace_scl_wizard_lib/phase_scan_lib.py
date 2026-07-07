@@ -64,9 +64,9 @@ class PhaseScan_Runner(QRunnable):
         self.max_sin_amp_err_spin_box = self.cavs_scan_cntrl.upper_panel_cntrl.max_sin_amp_err_spin_box
         self.bpm_min_amp_spin_box = self.cavs_scan_cntrl.bottom_panel_cntrl.bpm_min_amp_spin_box
         self.stat_for_in_enrg_spin_box = self.cavs_scan_cntrl.upper_panel_cntrl.stat_for_in_enrg_spin_box
-        self.wrap_phase_button = self.cavs_scan_cntrl.upper_panel_cntrl.wrap_phase_button
-        self.keep_phases_button = self.cavs_scan_cntrl.upper_panel_cntrl.keep_phases_button
-        self.eKin_measure_button = self.cavs_scan_cntrl.upper_panel_cntrl.eKin_measure_button
+        self.wrap_phase_checkbox = self.cavs_scan_cntrl.upper_panel_cntrl.wrap_phase_checkbox
+        self.keep_phases_checkbox = self.cavs_scan_cntrl.upper_panel_cntrl.keep_phases_checkbox
+        self.eKin_measure_checkbox = self.cavs_scan_cntrl.upper_panel_cntrl.eKin_measure_checkbox
         #---------------------------------------
         self.scan_stopper = self.cavs_scan_cntrl.scan_stopper
         self.scan_status_text = self.cavs_scan_cntrl.upper_panel_cntrl.scan_status_text
@@ -196,7 +196,7 @@ class PhaseScan_Runner(QRunnable):
             if(cav_wrapper.isGood == False): continue
             self.signals.scan_data_changed.emit(("table_selection_set",cav_ind))
             #---- collect statistics for energy measurents
-            if(self.eKin_measure_button.isChecked()):
+            if(self.eKin_measure_checkbox.isChecked()):
                 self.blankCavities(cav_ind)
                 eKin_guess = cav_wrapper.eKin_guess
                 energy_meter = self.lace_scl_wizard.getEneryMeter()
