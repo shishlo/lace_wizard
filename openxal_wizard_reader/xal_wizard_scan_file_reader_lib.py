@@ -42,8 +42,13 @@ class XALtoSCL_TuneWizardUpdater:
         #-----------------------------------------------------------------
         cav_wrappers = self.lace_scl_wizard.getCavWrappers()
         for cav_wrapper in cav_wrappers:
-            xal_cavity_wrapper = self.scl_scan_reader.getXAL_CavityWrapperDict()["SCL:"+cav_wrapper.getAlias()]
-            cav_wrapper.isGood = xal_cavity_wrapper.is_good
+            xal_cavity_wrapper = None
+            if(cav_wrapper.getAlias() == "CCL4"):
+                xal_cavity_wrapper = self.scl_scan_reader.getXAL_CavityWrapperDict()["AllOff"]
+            else: 
+                xal_cavity_wrapper = self.scl_scan_reader.getXAL_CavityWrapperDict()["SCL:"+cav_wrapper.getAlias()]
+            cav_wrapper.isGood = xal_cavity_wrapper.isGood()
+            cav_wrapper.isAnalyzed = xal_cavity_wrapper.isAnalyzed()
             (bpm0_name,bpm1_name) = xal_cavity_wrapper.getBPMs01()
             cav_wrapper.eKin_in = xal_cavity_wrapper.eKin_In()
             cav_wrapper.eKin_out = xal_cavity_wrapper.eKin_Out()
@@ -225,15 +230,18 @@ class SCL_Wizard_File_Reader:
         xal_cavity_wrapper_dict = {}
         cavs_scans_da = self.getSCL_ScansDA()
         for cav_scan_da in cavs_scans_da.childAdaptors():
-            cav_is_good = cav_scan_da.intValue("isAnalyzed")*cav_scan_da.intValue("isGood")
+            cav_name = cav_scan_da.stringValue("cav")
+            if(cav_scan_da.getName() == "AllOff"): cav_name = "AllOff"
+            cav_is_good = cav_scan_da.intValue("isGood")
+            cav_isAnalyzed = cav_scan_da.intValue("isAnalyzed")
+            if(cav_name == "AllOff"):
+                cav_is_good = cav_scan_da.intValue("isGood")
             bpm0_name = "None"
             bpm1_name = "None"
-            if(cav_is_good > 0): 
+            if(cav_is_good > 0 and cav_isAnalyzed > 0 and cav_name != "AllOff"): 
                 cav_is_good = True
                 bpm0_name = cav_scan_da.stringValue("bpm0")
                 bpm1_name = cav_scan_da.stringValue("bpm1")
-            else:
-                cav_is_good = False
             params_da = cav_scan_da.childAdaptors("Params")[0]
             cav_epics_phase = params_da.doubleValue("livePhase")
             cav_epics_amp = params_da.doubleValue("initLiveAmp")    
@@ -245,8 +253,6 @@ class SCL_Wizard_File_Reader:
             phase_scan_harm_amp_err = params_da.doubleValue("phase_scan_harm_err")
             eKin_in = params_da.doubleValue("eKin_in")
             eKin_out = params_da.doubleValue("bpm_eKin_out")
-            cav_name = cav_scan_da.stringValue("cav")
-            if(cav_scan_da.getName() == "AllOff"): cav_name = "AllOff"
             #print ("debug cav = ",cav_name," cav. phase = %7.2f"%cav_epics_phase)
             #----- BPMs phase difference between bpm0 and bpm1 vs cavity phase
             bpm_phase_diff_da = cav_scan_da.childAdaptors("Phase_Diff_GD")[0]
@@ -258,6 +264,7 @@ class SCL_Wizard_File_Reader:
             #----------------------------------------------------------------------
             xal_cav_wrapper = XAL_CavityScanDataWrapper(cav_name)
             xal_cav_wrapper.isGood(cav_is_good)
+            xal_cav_wrapper.isAnalyzed(cav_isAnalyzed)
             xal_cav_wrapper.setBPMs01(bpm0_name,bpm1_name)
             xal_cav_wrapper.EPICS_Phase(cav_epics_phase)
             xal_cav_wrapper.EPICS_Amp(cav_epics_amp)
@@ -402,6 +409,8 @@ class XAL_CavityScanDataWrapper(NamedObject):
         NamedObject.__init__(self, name)
         #---- self.bpm_data_dict[bpm_name] = [cav_phase_arr,bpm_phase_arr,bpm_amp_arr,bpm_x_arr,bpm_y_arr]
         self.is_good = False
+        #---- if scan data analysis for this cavity has been performed 
+        self.is_Analyzed = False
         #---- BPMs for Phase Difference sin-like scan data
         self.bpm0_name = "None"
         self.bpm1_name = "None"
@@ -447,6 +456,11 @@ class XAL_CavityScanDataWrapper(NamedObject):
         if(is_good == None): return self.is_good
         self.is_good = is_good
         return self.is_good
+        
+    def isAnalyzed(self,is_Analyzed = None):
+        if(is_Analyzed == None): return self.is_Analyzed
+        self.is_Analyzed = is_Analyzed
+        return self.is_Analyzed    
         
     def setBPMs01(self,bpm0_name,bpm1_name):
         self.bpm0_name = bpm0_name
