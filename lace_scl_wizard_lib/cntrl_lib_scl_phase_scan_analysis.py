@@ -60,6 +60,7 @@ from gui_lib.borderlayout import BorderLayout, Position
 from gui_lib.style_sheets_lib import StyleSheetFactory
 from gui_lib.table_view_model_lib import LACE_QTableView, LACE_DataTableModel
 from .wrappers_cavs_bpms_magnets import Cavity_Wrapper, BPM_Wrapper
+from .phase_scan_analysis_lib import AnalysisStateController, Analysis_Runner, AnalysisWorkerSignals
 
 #---------------------------------------------------------------------
 # Internal Sub - Controller for Analysis of the SCL Phase Scan data.
@@ -85,12 +86,12 @@ class Scan_Analysis_Cntrl:
         groupBox_style = StyleSheetFactory.groupBoxStyleSheet()
         
         #---- The QWidget with Cavities and analysis results table
-        self.cavs_analysis_table_view = LACE_QTableView()
+        self.cavs_table_view = LACE_QTableView()
         self.cavs_data_analysis_table_model = CavsScanDataAnalysisTableModel(self)
-        self.cavs_analysis_table_view.setModel(self.cavs_data_analysis_table_model)
-        self.cavs_analysis_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.cavs_analysis_table_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
-        self.cavs_analysis_table_view.selectionModel().selectionChanged.connect(self._cavsSelectionChanged)
+        self.cavs_table_view.setModel(self.cavs_data_analysis_table_model)
+        self.cavs_table_view.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.cavs_table_view.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.cavs_table_view.selectionModel().selectionChanged.connect(self._cavsSelectionChanged)
         
         #--- connection to cav_table_view in the initial state controller
         init_cavs_table_model = self.lace_scl_wizard.init_state_cntrl.cavs_data_table_model
@@ -105,7 +106,7 @@ class Scan_Analysis_Cntrl:
         central_layout = QHBoxLayout()
         central_layout.setSpacing(0)
         central_layout.setContentsMargins(0, 0, 0, 0)   
-        central_layout.addWidget(self.cavs_analysis_table_view,1)
+        central_layout.addWidget(self.cavs_table_view,1)
         
         central_view = QGroupBox()
         central_view.setLayout(central_layout)
@@ -121,10 +122,16 @@ class Scan_Analysis_Cntrl:
         main_layout.addWidget(self.bottom_panel_cntrl.getMainWidget(),1)
         
         #---- Set up plots. Plots themselves are belongs to self.bottom_panel_cntrl
-        self.eKinOut_line, self.eKinOut_line_fit_line = self.bottom_panel_cntrl.getLine_eKinOut_BPM_and_Model()        
+        self.eKinOut_line, self.eKinOut_line_fit_line = self.bottom_panel_cntrl.getLine_eKinOut_BPM_and_Model()
+        
+        #---- Signals for table and plot update during the analysis thread execution
+        self.analysis_worker_signals = AnalysisWorkerSignals()
         
         self.getMainWidget().setLayout(main_layout)
         
+        #---- Analysis state controller aka Analysis Stopper
+        self.analysis_stopper = AnalysisStateController()
+        self.threadpool = QThreadPool()        
 
     def getTabName(self):
         """ Returns the tab name the controller """
@@ -170,6 +177,30 @@ class Scan_Analysis_Cntrl:
         self.eKinOut_line.setData(x_arr,y_arr)        
         (x_arr,y_arr,y_err_arr) = cav_wrapper.eKin_out_fit_func.getXYErrLists()
         self.eKinOut_line_fit_line.setData(x_arr,y_arr)
+
+    @Slot(tuple)     
+    def scanDataUpdate(self,tuple_input):
+        """ Perfoms all actions on GUI """
+        (update_type,*rest) = tuple_input
+        #---- Type of message - Analysis status update
+        if(update_type == "status_update"):
+            msg_txt = rest[0]
+            self.upper_panel_cntrl.analysis_status_text.setText(msg_txt)
+            return
+        if(update_type == "update_eKin_plot"):
+            cav_wrapper = rest[0]
+        #---- Type of message - Scan status update
+        if(update_type == "table_selection_clear"):
+            self.cavs_table_view.clearSelection()
+            return
+        if(update_type == "table_selection_set"):
+            cav_ind = rest[0]
+            self.cavs_table_view.selectRow(cav_ind)
+            return
+        if(update_type == "table_changed"):
+            self.cavs_data_analysis_table_model.tableChanged() 
+            return          
+        return
         
 #----------------------------------------------------------
 #  Sub-panels for knobs and tables
@@ -216,17 +247,14 @@ class UpperAnalysisPanelCntrl:
         stopAnalysis_button.setStyleSheet(buttons_style)
         stopAnalysis_button.adjustSize()
         
-        """
-        #---- cavs button action assignment
-        setSyncPhase_Action = SetSyncPhase_Action(self) 
-        startScan_Action = StartScan_Action(self)
-        stopScan_Action = StopScan_Action(self)
-
-        setSynchPhase_button.clicked.connect(lambda: setSyncPhase_Action.performAction())
-        start_scan_button.clicked.connect(lambda: startScan_Action.performAction())
-        start_scan_selected_button.clicked.connect(lambda: startScan_Action.performActionForSelected())
-        stop_scan_button.clicked.connect(lambda: stopScan_Action.performAction())
-        """
+        startAnalysis_Action = StartAnalysis_Action(self)
+        startAnalysis_button.clicked.connect(lambda: startAnalysis_Action.performAction())
+        startSelectedAnalysis_button.clicked.connect(lambda: startAnalysis_Action.performActionForSelected())
+        
+        stopAnalysis_Action = StopAnalysis_Action(self)
+        stopAnalysis_button.clicked.connect(lambda: stopAnalysis_Action.performAction())
+        
+        #------------------------------------------------------------
         
         self.analysis_status_text = QLineEdit("Analysis Status:")
         self.analysis_status_text.setStyleSheet("color: blue; background-color: white;")
@@ -369,3 +397,69 @@ class CavsScanDataAnalysisTableModel(LACE_DataTableModel):
 #----------------------------------------------------------
 # Actions on events with buttons
 #----------------------------------------------------------
+
+class StartAnalysis_Action:
+    """ Starts phase scan analysis of all or selected cavities. """ 
+    def __init__(self,upper_panel_cntrl):
+        self.upper_panel_cntrl = upper_panel_cntrl
+
+    def _performAction(self,cav_wrappers):
+        """ It starts the phase scan analysis of the cavities from cav_wrappers list """
+        self.scan_analysis_cntrl = self.upper_panel_cntrl.scan_analysis_cntrl
+        self.cavs_phase_scan_cntrl = self.upper_panel_cntrl.cavs_phase_scan_cntrl
+        self.cavs_table_view = self.scan_analysis_cntrl.cavs_table_view
+        self.scan_analysis_cntrl.cavs_table_view.selectionModel().clearSelection()
+        analysis_worker_signals = self.scan_analysis_cntrl.analysis_worker_signals
+        analysis_runner = Analysis_Runner(self.scan_analysis_cntrl,cav_wrappers)
+        analysis_worker_signals.analysis_data_changed.connect(self.scan_analysis_cntrl.scanDataUpdate)
+        self.scan_analysis_cntrl.threadpool.start(analysis_runner)
+        print ("debug Starts the analysis for all or selected cavities. ")
+        
+    def performActionForSelected(self):
+        self.scan_analysis_cntrl = self.upper_panel_cntrl.scan_analysis_cntrl
+        #---- We cannot start a second scan -------
+        analysis_stopper = self.scan_analysis_cntrl.analysis_stopper
+        if(analysis_stopper.getIsRunning()): return
+        #------------------------------------------
+        cav_selection_model = self.scan_analysis_cntrl.cavs_table_view.selectionModel()
+        cav_wrappers = self.scan_analysis_cntrl.cav_wrappers
+        cav_name_column_ind = 0
+        QModelIndex_list = cav_selection_model.selectedIndexes()
+        cavs_list = []
+        for q_model_ind in QModelIndex_list:
+            if(q_model_ind.column() != cav_name_column_ind): continue
+            row = q_model_ind.row()
+            cav_wrapper = cav_wrappers[row]
+            if(not cav_wrapper.isGood):
+                cav_wrapper.cleanAllScanData()
+                continue
+            cavs_list.append(cav_wrapper)
+        self._performAction(cavs_list)        
+        print ("debug start scans for selected cavities.")   
+        
+    def performAction(self):
+        self.scan_analysis_cntrl = self.upper_panel_cntrl.scan_analysis_cntrl
+        cav_selection_model = self.scan_analysis_cntrl.cavs_table_view.selectionModel()
+        QModelIndex_list = cav_selection_model.selectedIndexes()
+        row = 0
+        if(len(QModelIndex_list) > 0):
+            row = QModelIndex_list[0].row()
+        #---- We cannot start a second scan -------
+        analysis_stopper = self.scan_analysis_cntrl.analysis_stopper
+        if(analysis_stopper.getIsRunning()): return
+        #------------------------------------------
+        cav_wrappers = self.scan_analysis_cntrl.cav_wrappers[row:]
+        self._performAction(cav_wrappers)
+        print ("debug Starts the phase scans for all cavities. ")
+
+class StopAnalysis_Action:
+    """ Stop the analysis for all cavities. """ 
+    def __init__(self,upper_panel_cntrl):
+        self.upper_panel_cntrl = upper_panel_cntrl
+
+    def performAction(self):
+        """ It stops the analysis """
+        self.scan_analysis_cntrl = self.upper_panel_cntrl.scan_analysis_cntrl
+        self.analysis_stopper = self.scan_analysis_cntrl.analysis_stopper
+        self.analysis_stopper.setShouldStop(True)
+        print ("debug Stops the phase scans analysis. ")
