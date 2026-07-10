@@ -36,8 +36,9 @@ class Cavity_Wrapper:
         #---- vs. cavity phase - measured and 1st harmonic fitting
         self.phaseDiffBPM01_func = Function()
         self.phaseDiffBPM01_fit_func = Function()
-        #---- Function eKin_Out ( cavity phase) for analysis
+        #---- Function eKin_Out and its fit ( cavity phase) for analysis
         self.eKin_out_func = Function()
+        self.eKin_out_fit_func = Function()
         #--- use or not in phase scan analysis: self.bpm_wrappers_useInPhaseAnalysis[bpm_wrapper,]
         self.bpm_wrappers_useInPhaseAnalysis = []
         for bpm_wrapper in self.bpm_wrappers:
@@ -96,6 +97,16 @@ class Cavity_Wrapper:
         self.epicsPhase = 0.
         self.epicsAmpInit = 0.
         self.epicsPhaseInit = 0.
+        #---- scan results cleaning
+        for bpm_wrapper in self.bpm_wrappers:
+            self.bpm_amp_phase_dict[bpm_wrapper.getAlias()][0].clean()
+            self.bpm_amp_phase_dict[bpm_wrapper.getAlias()][1].clean()
+        self.bpm_amp_phase_entrance_funcions[0].clean()
+        self.bpm_amp_phase_entrance_funcions[1].clean()
+        self.phaseDiffBPM01_func.clean()
+        self.phaseDiffBPM01_fit_func.clean()
+        self.eKin_out_func.clean()
+        self.eKin_out_fit_func.clean()
         #-- design parameters will be defined after analysis of the phase scan data
         self.modelAmp = 0.
         self.modelPhase = 0.       

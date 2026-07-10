@@ -32,7 +32,7 @@ from orbit.core.orbit_utils import Function
 
 from lace_om_lib.scl_online_model_lib import SCL_Online_Model
 from lace_scl_wizard_lib.cntrl_lib_init_state import InitState_Cntrl
-from lace_scl_wizard_lib.cntrl_lib_scl_phase_scan import CavsPhaseScan_Cntrl
+from lace_scl_wizard_lib.cntrl_lib_scl_phase_scan_and_analysis import Cavs_PhaseScan_and_Analisys_Cntrl
 from lace_scl_wizard_lib.energy_meter_lib import EnergyMeter
 from openxal_wizard_reader.xal_wizard_scan_file_reader_lib import XALtoSCL_TuneWizardUpdater
 
@@ -71,7 +71,7 @@ class LACE_SCL_Wizard:
         self.tabs.addTab(self.init_state_cntrl.getMainWidget(),self.init_state_cntrl.getTabName())
 
         #---- Phase scan and analysis controller
-        self.cavs_phase_scan_cntrl = CavsPhaseScan_Cntrl(self)
+        self.cavs_phase_scan_cntrl = Cavs_PhaseScan_and_Analisys_Cntrl(self)
         self.controllers_arr.append(self.cavs_phase_scan_cntrl)
         self.tabs.addTab(self.cavs_phase_scan_cntrl.getMainWidget(),self.cavs_phase_scan_cntrl.getTabName())
 
@@ -163,7 +163,7 @@ class LACE_SCL_Wizard:
             options=options)
         if (not fileName): return
         """
-        fileName = '/home/shi/XAL_Data/SCL Wizard/ProductionSCL_RF_Phases_2025_09_15.sclw'
+        fileName = './openxal_wizard_reader/test_data_2025_09_15.sclw'
         self.xal_to_scl_tune_wizard_updater = XALtoSCL_TuneWizardUpdater(self)
         self.xal_to_scl_tune_wizard_updater.updateSCL_Tune_Wizard(fileName)
         self.mainWindow.setWindowTitle("XAL Export: "+str(fileName))
