@@ -20,6 +20,7 @@ class EnergyMeter:
     """ It measures the energy of the beam using BPMs. """
     def __init__(self,lace_scl_wizard):
         self.lace_scl_wizard = lace_scl_wizard
+        self.poly_fit = PolynomialFit(1)
 
     def measureEnergy(cav_wrapper,eKin_guess,n_pulses = 3,sleep_time = 1.1, min_bpm_amp = 1.0):
         """
@@ -37,7 +38,6 @@ class EnergyMeter:
         eKin_err = 0.
         phase_pos_func = Function()
         amp_pos_func = Function()
-        poly_fit = PolynomialFit(1)
         bpm_init_wrappers = self.lace_scl_wizard.getBPM_Wrappers()
         pos_min = cav_wrapper.getPosition()
         bpm_wrappers = []
@@ -80,8 +80,6 @@ class EnergyMeter:
         #---- BPM frequency in CCL, SCL, HEBT
         bpm_freq = 402.5e+6
         coeff_init = 360.0*bpm_freq/c_light
-        bpm_wrappers = []
-        bpm_phases = []
         beta_guess = math.sqrt(eKin_guess*(eKin_guess+2*mass))/(eKin_guess+mass)
         #---- coeff from position difference to phase difference
         coeff_guess = coeff_init/beta_guess
@@ -90,8 +88,7 @@ class EnergyMeter:
         for bpm_wrapper in bpm_wrappers:
             phase = bpm_amp_phase_err_dict[bpm_wrapper.getName()][1][0]
             phase_offset = bpm_wrapper.getEPICS_PhaseOffset()
-            phase_corrected = phase - phase_offset
-            phaseNearTargetPhaseDeg(phase_corrected,0.)
+            phase_corrected = phaseNearTargetPhaseDeg(phase - phase_offset,0.)
             print ("bpm=",bpm_wrapper.bpm.getName()," phase, offset, corrected = %+7.1f %+7.1f %+7.1f"%(phase,phase_offset,phase_corrected))
             bpm_phases.append(phase_corrected)
         for bpm_ind in range(1,len(bpm_wrappers)):
@@ -120,8 +117,8 @@ class EnergyMeter:
             pos = pos - pos_center
             phase_pos_func.add(pos,phase)
             print ("bpm=",bpm_wrapper.bpm.getName()," pos = %8.3f "%pos," phase, guess = %+7.1f %+7.1f"%(phase,phase_guess))
-        poly_fit.fitFunction(phase_pos_func)
-        poly_func = poly_fit.getPolynomial()
+        self.poly_fit.fitFunction(phase_pos_func)
+        poly_func = self.poly_fit.getPolynomial()
         #--- for debug printing only
         for ind in range(phase_pos_func.getSize()):
             pos = phase_pos_func.x(ind)
@@ -141,5 +138,55 @@ class EnergyMeter:
         eKin_err = mass*beta*beta_err*(gamma)**3
         #---- polynomial
         return (eKin,eKin_err,bpm_wrappers,amp_pos_func,phase_pos_func,poly_func,bpm_wrappers,bpm_amp_phase_err_dict)
+        
+        
+    def fitEnergyFromBPMsPhases(eKin_guess,bpm_positions,bpm_phases,bpm_offsets):
+        """
+        Fit the energy using bpms phases, phase offsets, and positions arrays.
+        Here we assume BPMs frequency equals to 402.5 MHz.
+        Particles are H-.
+        """
+        #---- we are not going to change phases in the initial array
+        bpm_phases = bpm_phases[:]
+        # set H- mass
+        mass = 938.272089 + 2*0.511     
+        c_light = speed_of_light
+        #---- BPM frequency in CCL, SCL, HEBT
+        bpm_freq = 402.5e+6
+        coeff_init = 360.0*bpm_freq/c_light
+        beta_guess = math.sqrt(eKin_guess*(eKin_guess+2*mass))/(eKin_guess+mass)
+        #---- coeff from position difference to phase difference
+        coeff_guess = coeff_init/beta_guess
+        #---- Let's correct phases with offsets, and add/subsract 360. deg
+        #---- to make phase vs position almost linear.
+        pos_center = (bpm_positions[0] + bpm_positions[-1])/2
+        phase_pos_func = Function()
+        for bpm_ind in range(len(bpm_phases)):
+            bpm_phases[bpm_ind] = phaseNearTargetPhaseDeg(bpm_phases[bpm_ind] - bpm_offsets[bpm_ind])
+        phase_pos_func.add(bpm_positions[0] - pos_center,bpm_phases[0])
+        for bpm_ind in range(1,len(bpm_phases)):
+            pos_diff = bpm_positions[bpm_ind] - bpm_positions[bpm_ind-1]
+            phase_guess = bpm_phases[bpm_ind -1] + coeff_guess*pos_diff
+            bpm_phases[bpm_ind] = phaseNearTargetPhaseDeg(bpm_phases[bpm_ind],phase_guess)
+            phase_pos_func.add(bpm_positions[bpm_ind] - pos_center, bpm_phases[bpm_ind])
+        #---- Now we make a polynomial fit
+        self.poly_fit.fitFunction(phase_pos_func)
+        poly_func = self.poly_fit.getPolynomial()
+        [coef_arr,err_arr] = poly_fit.getCoefficientsAndErr()
+        #---- Get energy from the slope
+        coeff = coef_arr[1]
+        coeff_err = err_arr[1]
+        beta = coeff_init/coeff
+        gamma = 1./math.sqrt(1.0 - beta**2)
+        eKin = mass*(1./math.sqrt(1.0 - beta**2) - 1.0)
+        beta_err = coeff_err*coeff_init/coeff**2
+        eKin_err = mass*beta*beta_err*(gamma)**3
+        phase_pos_fit_func = Function()
+        for ind in range(phase_pos_func.getSize()):
+            pos = phase_pos_func.x(ind)
+            phase_fit = poly_func.value(pos)
+            phase_pos_fit_func.add(pos,phase_fit)
+        return (eKin,eKin_err,phase_pos_func,phase_pos_fit_func)
+
     
         
