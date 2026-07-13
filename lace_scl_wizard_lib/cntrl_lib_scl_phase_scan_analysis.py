@@ -168,7 +168,7 @@ class Scan_Analysis_Cntrl:
         row = selected.indexes()[0].row()
         #----
         cav_wrapper = self.cav_wrappers[row]
-        print ("debug cavity selected in analysis =",cav_wrapper.alias)
+        #print ("debug cavity selected in analysis =",cav_wrapper.alias)
         #---- plot the graph of eKinOut for acvity
         title = "eKinOut vs. Phase for Cavity = " + cav_wrapper.getAlias()
         self.bottom_panel_cntrl.eKin_out_plot.setTitle(title)

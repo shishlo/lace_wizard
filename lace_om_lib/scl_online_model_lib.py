@@ -557,6 +557,7 @@ class ModelCavity:
         bunch_in = get_SCL_EmptyBunch(eKinIn)
         eKinOut_arr = []
         timeOut_arr = []
+        epics_model_cav_phase_init = self.getEPICS_CavityModelPhase()
         for cav_epics_phase in cavEPICS_PhaseArr:
             self.setEPICS_CavityModelPhase(cav_epics_phase)
             ind_start = self.cav_rfgap_start_ind
@@ -566,6 +567,8 @@ class ModelCavity:
             tm = bunch.getSyncParticle().time()
             eKinOut_arr.append(eKinOut)
             timeOut_arr.append(tm)
+        #---- Restore the EPICS model cavity phase after scan
+        self.setEPICS_CavityModelPhase(epics_model_cav_phase_init)
         return (eKinOut_arr,timeOut_arr)
         
 class TrackingResults:
