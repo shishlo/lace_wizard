@@ -29,10 +29,10 @@ def get_SCL_EmptyBunch(eKin):
 	bunch = Bunch()
 	syncPart = bunch.getSyncParticle()
 	# set H- mass
-	# self.bunch.mass(938.272089 + 2*0.511)
-	bunch.mass(938.272089 + 2*0.511)
+	# self.bunch.mass((938.272089 + 2*0.511)/1000.)
+	bunch.mass((938.272089 + 2*0.511)/1000.)
 	bunch.charge(-1.0)
-	syncPart.kinEnergy(eKin)
+	syncPart.kinEnergy(eKin/1000.)
 	return bunch 
 
 class SNS_Linac_BunchGenerator:

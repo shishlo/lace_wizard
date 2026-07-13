@@ -218,7 +218,7 @@ class CavsDataTableModel(LACE_DataTableModel):
             model_amp_item  = self.item(cav_ind,7) ; model_amp_item.setText("%6.4f"%cav_wrapper.modelAmp)           
             model_phase_item = self.item(cav_ind,8) ; model_phase_item.setText("%+6.1f"%cav_wrapper.modelPhase) 
             model_coeff_amp_item = self.item(cav_ind,9) ; model_coeff_amp_item.setText("%6.4f"%cav_wrapper.modelCoeffToEpicsAmp)
-            phase_offset_item = self.item(cav_ind,10) ; phase_offset_item.setText("%+6.1f"%cav_wrapper.model_phase_shift)
+            phase_offset_item = self.item(cav_ind,10) ; phase_offset_item.setText("%+6.1f"%cav_wrapper.getModelCavityPhaseOffset())
             bpm1_item = self.item(cav_ind,11) ;  bpm1_item.setText("")
             if(cav_wrapper.bpm_wrapper0 != None):
                 if(cav_wrapper.bpm_wrapper0.isGood):

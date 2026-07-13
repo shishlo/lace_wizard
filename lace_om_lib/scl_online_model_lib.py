@@ -499,7 +499,7 @@ class ModelCavity:
         
     def setEPICS_CavityModelPhase(self,epics_cav_phase):
         self.epics_cav_phase = epics_cav_phase
-        self.setModelPhase(self.epics_cav_phase + self.cav_phase_offset)
+        self.setModelPhase(phaseNearTargetPhaseDeg(self.epics_cav_phase + self.cav_phase_offset,0.))
         
     def getEPICS_CavityModelPhase(self):
         return self.epics_cav_phase

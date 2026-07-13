@@ -9,6 +9,7 @@ import math
 import sys
 
 from orbit.core.orbit_utils import Function
+from orbit.core.orbit_utils import SplineCH
 
 # import the utilities
 from orbit.utils import phaseNearTargetPhase, phaseNearTargetPhaseDeg
@@ -74,6 +75,8 @@ class Analysis_Runner(QRunnable):
         #---------------------------------------
         self.bpm_min_amp_spin_box = self.cavs_scan_cntrl.bottom_panel_cntrl.bpm_min_amp_spin_box
         #---------------------------------------
+        self.spline = SplineCH()
+        #---------------------------------------
         self.analysis_stopper = self.scan_analysis_cntrl.analysis_stopper
         self.scan_status_text = self.scan_analysis_cntrl.upper_panel_cntrl.analysis_status_text
         self.statusLabel = self.lace_scl_wizard.getStatusLabel()
@@ -91,19 +94,56 @@ class Analysis_Runner(QRunnable):
         min_bpm_amp = self.bpm_min_amp_spin_box.value()
         iter_count = 0
         time_start = time.time()      
-        for cav_wrapper in self.cav_wrappers:
+        for cav_local_ind,cav_wrapper in enumerate(self.cav_wrappers):
             cav_start = cav_wrapper.getAlias()
             scav_stop = self.cav_wrappers[-1].getAlias()
-            msg_txt = "Analysis started with cvity = " + cav_start + " to " + cav_stop
+            msg_txt = "Analysis cvity = " + cav_start + " to " + cav_stop
             self.signals.analysis_data_changed.emit(("status_update",msg_txt))
             #---- cav index in the table
             cav_ind = self.cavs_data_analysis_table_model.cav_wrappers.index(cav_wrapper)
             self.signals.analysis_data_changed.emit(("table_selection_clear",))
-            if(cav_wrapper.isGood == False): continue
+            if(cav_wrapper.isGood == False):
+                cav_wrapper_previous = self.cavs_data_analysis_table_model.cav_wrappers[cav_ind-1]
+                cav_wrapper.E0TL = 0.
+                cav_wrapper.eKin_in = cav_wrapper_previous.eKin_out
+                cav_wrapper.eKin_out = cav_wrapper_previous.eKin_out
+                cav_wrapper.isAnalyzed = False
+                continue
             self.signals.analysis_data_changed.emit(("table_selection_set",cav_ind))
             #---- perform analysis
             (E0TL,cav_phase_offset,eKin_in_guess) = fitCosineFunc(cav_wrapper.eKin_out_func,cav_wrapper.eKin_out_fit_func)
-            print ("debug  cav=",cav_wrapper.getAlias()," eKin_in = ",eKin_in_guess," E0TL =",E0TL," cav_phase_offset=",cav_phase_offset)
+            #print ("debug  cav=",cav_wrapper.getAlias()," eKin_in = ",eKin_in_guess," E0TL =",E0TL," cav_phase_offset=",cav_phase_offset)
+            #---- These are preliminary setting based on 1-st order harmonic of phase scan
+            cav_wrapper.E0TL = E0TL
+            cav_wrapper.eKin_in = eKin_in_guess
+            self.spline.compile(cav_wrapper.eKin_out_fit_func)
+            cav_wrapper.eKin_out = self.spline.getY(cav_wrapper.epicsPhase)
+            #---- No further analysis for CCL4 cavity
+            if(cav_start.find("CCL") >= 0):
+                cav_wrapper.E0TL = 0.
+                cav_wrapper.eKin_out = cav_wrapper.eKin_in
+                cav_wrapper.setModelCavityPhaseOffset(0.)
+                cav_wrapper.isAnalyzed = True
+                continue
+            #---- Fitting model parameters directly
+            print ("debugav=",cav_wrapper.getAlias()," init phase_offset=",cav_wrapper.getModelCavityPhaseOffset()," new=",cav_phase_offset)
+            cav_wrapper.setModelCavityPhaseOffset(cav_phase_offset)
+            cav_wrapper.eKin_in = self.cavs_data_analysis_table_model.cav_wrappers[cav_ind-1].eKin_out
+            scorer = CavityParamsScorer_eKinOut(cav_wrapper,cav_wrapper.eKin_in)
+            #---- Let's get approximate sin-like eKinOut vs cav. phase function using the model
+            #---- We will use E0TL_appr to correct cavity model amplitude according the E0TL_appr and cav_wrapper.E0TL
+            scorer.calcModel_eKinOut_Arr(cav_wrapper.eKin_in)
+            eKin_out_appr_model_func = scorer.update_eKinOutFitFunction()
+            """
+            E0TL_appr = fitCosineFunc(eKin_out_appr_model_func)[0]
+            coeff_amp = cav_wrapper.E0TL/E0TL_appr
+            model_cav_amp = cav_wrapper.model_cav.getModelAmp()
+            cav_wrapper.model_cav.setModelAmp(model_cav_amp*coeff_amp)
+            #---- Let's fit the cavity model parameters 
+            best_score = self.performCavityParamsFitting_eKin(scorer,cav_wrapper.eKin_in)[0]
+            print ("debug  cav=",cav_wrapper.getAlias(), "best score = ",math.sqrt(best_score))
+            """
+            #----  
             if(self.analysis_stopper.getShouldStop()):
                 self.analysis_stopper.setShouldStop(False)
                 self.analysis_stopper.setIsRunning(False)
@@ -121,16 +161,15 @@ class Analysis_Runner(QRunnable):
         self.analysis_stopper.setIsRunning(False)
         return
 
-    def performCavityParamsFitting_eKin(self,cav_wrapper,eKinIn):
+    def performCavityParamsFitting_eKin(self,scorer,eKinIn):
         """ Fitting is done using eKinOut(cav_phase) data from BPMs """
-        scorer = CavityParamsScorer_eKinOut(cav_wrapper,eKinIn)
         trialPoint = scorer.getTrialPoint()
         sum_diff2 = scorer.getScore(trialPoint)
         
         #---- Search algorithm from PyORBIT native package
         searchAlgorithm = SimplexSearchAlgorithm()
         
-        maxIter = 200
+        maxIter = 100
         solverStopper = SolveStopperFactory.maxIterationStopper(maxIter)
         
         #max_time = 0.04
@@ -161,43 +200,40 @@ class Analysis_Runner(QRunnable):
         best_score = scorer.getScore(trialPoint)
         return (best_score,scorer)
 
-
-
 class CavityParamsScorer_eKinOut(Scorer):
     """
     The implementation of the abstract Score class 
     as eKinOut(cav_phase) vs cavity's parameters (amp., phase offset) scorer 
     between BPMs' data and the cavity model.
     """
-    def __init__(self,cav_wrapper,om_model,eKinIn):
-        self.cav_wrapper = cav_wrapper
-        self.om_model = om_model        
+    def __init__(self,cav_wrapper,eKinIn):
+        self.cav_wrapper = cav_wrapper      
         self.model_cav = self.cav_wrapper.model_cav
         self.eKinIn = eKinIn
         self.eKin_out_func = self.cav_wrapper.eKin_out_func
         self.eKin_out_fit_func = self.cav_wrapper.eKin_out_fit_func
         (self.cav_phase_arr,self.eKInOut_BPMs_arr,error_arr) = self.eKin_out_func.getXYErrLists()
-        self.eKInOut_Model_arr = []
+        self.eKInOut_model_arr = []
         
     def getCavityWrapper(self):
         return self.self.cav_wrapper
         
     def getModel_eKinOut_Arr(self):
-        return self.eKInOut_Model_arr
+        return self.eKInOut_model_arr
         
-    def eKinOutModelFunction(self):
-        if(len(self.cav_phase_arr) == len(self.eKInOut_Model_arr)):
-            self.eKin_out_fit_func.initFromLists(self.cav_phase_arr,self.eKInOut_Model_arr)
+    def update_eKinOutFitFunction(self):
+        if(len(self.cav_phase_arr) == len(self.eKInOut_model_arr)):
+            self.eKin_out_fit_func.initFromLists(self.cav_phase_arr,self.eKInOut_model_arr)
         return self.eKin_out_fit_func
         
     def calcModel_eKinOut_Arr(self,eKinIn):
         (eKinOut_arr,timeOut_arr) = self.model_cav.trackEmptyBunch(eKinIn,self.cav_phase_arr)
-        self.eKInOut_Model_arr = eKinOut_arr
-        return self.eKInOut_Model_arr
+        self.eKInOut_model_arr = eKinOut_arr
+        return self.eKInOut_model_arr
 
     def printResults(self, file_name_prefix = None):
         self.calcModel_eKinOut_Arr(self.eKinIn)
-        if(len(self.eKInOut_Model_arr) != len(self.cav_phase_arr)): return
+        if(len(self.eKInOut_model_arr) != len(self.cav_phase_arr)): return
         print ("================================")
         cav_name = self.cav_wrapper.getName()
         print ("Cavity=",cav_name)
@@ -211,7 +247,7 @@ class CavityParamsScorer_eKinOut(Scorer):
         #------------------------------------------_
         for ind,cav_phase in enumerate(self.cav_phase_arr):
             eKin_out_bpm = self.eKInOut_BPMs_arr[ind]
-            eKin_out_model = self.eKInOut_Model_arr[ind]
+            eKin_out_model = self.eKInOut_model_arr[ind]
             diff = eKin_out_model - eKin_out_bpm
             st  = " %+6.1f "%cav_phase
             st += " %8.3f  %8.3f   %+8.4f"%(eKin_out_bpm,eKin_out_model,diff)
@@ -250,7 +286,7 @@ class CavityParamsScorer_eKinOut(Scorer):
         diff2 = 0.
         for ind,cav_phase in enumerate(self.cav_phase_arr):
             eKin_out_bpm = self.eKInOut_BPMs_arr[ind]
-            eKin_out_model = self.eKInOut_Model_arr[ind]
+            eKin_out_model = self.eKInOut_model_arr[ind]
             diff2 += (eKin_out_model - eKin_out_bpm)**2
         if(len(self.cav_phase_arr) > 0): diff2 /= len(self.cav_phase_arr) 
         return diff2

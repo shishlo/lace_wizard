@@ -52,6 +52,9 @@ class XALtoSCL_TuneWizardUpdater:
             (bpm0_name,bpm1_name) = xal_cavity_wrapper.getBPMs01()
             cav_wrapper.eKin_in = xal_cavity_wrapper.eKin_In()
             cav_wrapper.eKin_out = xal_cavity_wrapper.eKin_Out()
+            if(cav_wrapper.getAlias() == "CCL4"):
+                cav_wrapper.eKin_in = 185.6
+                cav_wrapper.eKin_out = 185.6
             cav_wrapper.eKin_guess = cav_wrapper.eKin_out
             cav_wrapper.synch_acc_phase = xal_cavity_wrapper.realSynchPhase()
             cav_wrapper.epicsAmp = xal_cavity_wrapper.EPICS_Amp() 

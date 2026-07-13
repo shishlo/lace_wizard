@@ -64,13 +64,13 @@ class Cavity_Wrapper:
         self.sin_phase_func_amp_err = 0.
         #---- accelerating phase of the cavity: self.epicsPhase shift from cav. phase for min phase of BPMs
         self.synch_acc_phase = -15.
-        #---- This is a phase shift between EPICS and model phases
-        self.model_phase_shift = 0.
         #---- kinetic energies in MeV
         self.eKin_in = 185.6
         self.eKin_out = 185.6
         self.eKin_guess = 185.6
         self.eKin_guess_err = 0.
+        #---- E0TL parameter of simplified model
+        self.E0TL = 0.
         #---- EPICS connections, PV channels
         self.is_connected = False
         pv_name_start = ""
@@ -115,9 +115,7 @@ class Cavity_Wrapper:
         self.sin_phase_func_amp = 0.
         self.sin_phase_func_amp_err = 0.
         #---- accelerating phase of the cavity: self.epicsPhase shift from cav. phase for min phase of BPMs
-        self.synch_acc_phase = -15.
-        #---- This is a phase shift between EPICS and model phases
-        self.model_phase_shift = 0.      
+        self.synch_acc_phase = -15.     
         
     def connectPVs(self):
         self.is_connected = True
@@ -129,7 +127,13 @@ class Cavity_Wrapper:
         
     def isConnected(self):
         return self.is_connected
-     
+    
+    def setModelCavityPhaseOffset(self,model_phase_shift):
+        self.model_cav.setCavityPhaseOffset(model_phase_shift)
+        
+    def getModelCavityPhaseOffset(self):
+        return self.model_cav.getCavityPhaseOffset()
+    
     def setCavityEPICS_Blanking(self,cav_is_blank):
         if(self.is_connected):
             self.cav_blankig_pv.put(bool(cav_is_blank))
@@ -152,6 +156,7 @@ class Cavity_Wrapper:
     def setEPICS_CavityPhase(self,epics_cav_phase):
         if(self.is_connected):
             self.cav_phase_pv.put(epics_cav_phase)
+        self.epicsPhase = epics_cav_phase
         
     def getEPICS_CavityPhase(self):
         if(self.is_connected):
