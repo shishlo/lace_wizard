@@ -114,9 +114,10 @@ class Analysis_Runner(QRunnable):
             self.signals.analysis_data_changed.emit(("table_selection_set",cav_ind))
             #------------------------------------------------------------------
             #---- Here we start analysis of full array of BPMs data to get
-            #---- functions eKinOut vs cavity phase. We will consider set of 
+            #---- functions eKinOut vs. cavity phase. We will consider set of 
             #---- BPMs for each cavity phase and use the energy meter to get
-            #---- eKinOut for this phase
+            #---- eKinOut for this phase.
+            #---- As the result we will get cav_wrapper.eKin_out_func function.
             #------------------------------------------------------------------
             eKin_out_guess = cav_wrapper.eKin_out
             if(cav_start.find("CCL") >= 0):
@@ -242,15 +243,13 @@ class Analysis_Runner(QRunnable):
         for bpm_wrapper in cav_wrapper.bpm_wrappers:
             (bpm_amp_func,bpm_phase_func) = bpm_amp_phase_dict[bpm_wrapper.getAlias()]
             bpm_amp_min = bpm_amp_func.getMinY()
-            if(bpm_amp_min > min_bpm_amp and bpm_wrapper.isGood and bpm_wrapper.getPosition() > cav_wrapper.getPosition()):
+            if(bpm_wrapper.isGood and (bpm_amp_min > min_bpm_amp) and bpm_wrapper.getPosition() > cav_wrapper.getPosition()):
                 bpm_wrappers.append(bpm_wrapper)
         #-----------------------------------------------
         cav_wrapper.eKin_out_func.clean()
         n_cav_phase_points = bpm_amp_phase_dict[bpm_wrappers[0].getAlias()][1].getSize()
-        print ("debug cav=",cav_wrapper.getAlias()," n-phase-points =",n_cav_phase_points)
         bpm_positions = []
         bpm_offsets = []
-        cav_phases = []
         for bpm_wrapper in bpm_wrappers:
             bpm_positions.append(bpm_wrapper.getPosition())
             bpm_offsets.append(bpm_wrapper.getPhaseOffset())
@@ -259,7 +258,7 @@ class Analysis_Runner(QRunnable):
             bpm_phases = []
             cav_phase = bpm_amp_phase_dict[bpm_wrappers[0].getAlias()][1].x(cav_phase_ind)
             for bpm_wrapper in bpm_wrappers:
-                bpm_phase = bpm_amp_phase_dict[bpm_wrapper.getAlias()][0].x(cav_phase_ind)
+                bpm_phase = bpm_amp_phase_dict[bpm_wrapper.getAlias()][1].y(cav_phase_ind)
                 bpm_phases.append(bpm_phase)
             res_arr = self.energy_meter.fitEnergyFromBPMsPhases(eKin_guess,bpm_positions,bpm_phases,bpm_offsets)
             (eKin,eKin_err,phase_pos_func,phase_pos_fit_func) = res_arr

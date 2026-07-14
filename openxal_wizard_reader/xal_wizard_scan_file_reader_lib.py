@@ -91,6 +91,7 @@ class XALtoSCL_TuneWizardUpdater:
                 (ampFunc,phaseFunc) = cav_wrapper.bpm_amp_phase_dict[bpm_wrapper.getAlias()]
                 ampFunc.clean()
                 phaseFunc.clean()
+                cav_phase_arr = xal_cavity_wrapper.getCavity_PhaseArr(bpm_wrapper.getAlias())
                 bpm_amp_arr = xal_cavity_wrapper.getBPM_AmpArr(bpm_wrapper.getAlias())
                 bpm_phase_arr = xal_cavity_wrapper.getBPM_PhaseArr(bpm_wrapper.getAlias())
                 if(len(bpm_amp_arr) != len(bpm_phase_arr) or len(bpm_amp_arr) != len(cav_phase_arr)): continue
