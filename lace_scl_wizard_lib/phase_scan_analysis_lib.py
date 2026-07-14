@@ -61,7 +61,7 @@ class Analysis_Runner(QRunnable):
     """ 
     It performs the analysis of scan data for selected or all cavities. 
     """
-    def __init__(self,scan_analysis_cntrl,cav_wrappers):
+    def __init__(self,scan_analysis_cntrl,cav_wrappers, simplex_iter = 50):
         QRunnable.__init__(self)
         self.scan_analysis_cntrl = scan_analysis_cntrl
         self.cav_wrappers = cav_wrappers        
@@ -72,6 +72,9 @@ class Analysis_Runner(QRunnable):
         #--------------------------------------
         self.cavs_table_view = self.scan_analysis_cntrl.cavs_table_view
         self.cavs_data_analysis_table_model = self.scan_analysis_cntrl.cavs_data_analysis_table_model
+        #---------------------------------------
+        #---- Number of steps in simplex fitting of cavity parameters
+        self.simplex_iter = simplex_iter
         #---------------------------------------
         self.bpm_min_amp_spin_box = self.cavs_scan_cntrl.bottom_panel_cntrl.bpm_min_amp_spin_box
         #---------------------------------------
@@ -126,23 +129,33 @@ class Analysis_Runner(QRunnable):
                 cav_wrapper.isAnalyzed = True
                 continue
             #---- Fitting model parameters directly
-            print ("debugav=",cav_wrapper.getAlias()," init phase_offset=",cav_wrapper.getModelCavityPhaseOffset()," new=",cav_phase_offset)
-            cav_wrapper.setModelCavityPhaseOffset(cav_phase_offset)
+            #print ("debug cav=",cav_wrapper.getAlias()," phase_offset=",cav_phase_offset)
+            #---- Now we create the phase scan for the model to compare it to 
+            #---- the real Cosine Fit for cav_wrapper.eKin_out_func
+            cav_wrapper.setModelCavityPhaseOffset(0.)
             cav_wrapper.eKin_in = self.cavs_data_analysis_table_model.cav_wrappers[cav_ind-1].eKin_out
             scorer = CavityParamsScorer_eKinOut(cav_wrapper,cav_wrapper.eKin_in)
             #---- Let's get approximate sin-like eKinOut vs cav. phase function using the model
             #---- We will use E0TL_appr to correct cavity model amplitude according the E0TL_appr and cav_wrapper.E0TL
             scorer.calcModel_eKinOut_Arr(cav_wrapper.eKin_in)
+            #---- This will rewrite the cav_wrapper.eKin_out_fit_func
             eKin_out_appr_model_func = scorer.update_eKinOutFitFunction()
-            """
-            E0TL_appr = fitCosineFunc(eKin_out_appr_model_func)[0]
-            coeff_amp = cav_wrapper.E0TL/E0TL_appr
+            (E0TL_model,cav_phase_offset_model,eKin_in_guess_model) = fitCosineFunc(eKin_out_appr_model_func)
+            #print ("debug cav=",cav_wrapper.getAlias()," phase_offset_model=",cav_phase_offset_model)
+            #---- Fix the model amplitude - it will be closer to BPM data
+            coeff_amp = cav_wrapper.E0TL/E0TL_model
             model_cav_amp = cav_wrapper.model_cav.getModelAmp()
             cav_wrapper.model_cav.setModelAmp(model_cav_amp*coeff_amp)
+            #---- Fix the cavity phase offset - it will be closer to BPM data
+            cav_phase_offset_model -= cav_phase_offset
+            cav_wrapper.setModelCavityPhaseOffset(-cav_phase_offset_model)
+            scorer.calcModel_eKinOut_Arr(cav_wrapper.eKin_in)
+            eKin_out_appr_model_func = scorer.update_eKinOutFitFunction()
             #---- Let's fit the cavity model parameters 
-            best_score = self.performCavityParamsFitting_eKin(scorer,cav_wrapper.eKin_in)[0]
-            print ("debug  cav=",cav_wrapper.getAlias(), "best score = ",math.sqrt(best_score))
-            """
+            best_score, trialPoint = self.performCavityParamsFitting_eKin(scorer,cav_wrapper.eKin_in)
+            [model_cav_amp,model_cav_phase_offset] = trialPoint.getVariableProxyValuesArr()
+            print ("debug  cav=",cav_wrapper.getAlias()," model_cav_amp,model_cav_phase_offset=",[model_cav_amp,model_cav_phase_offset])
+            #print ("debug  cav=",cav_wrapper.getAlias(), "best score = ",math.sqrt(best_score))
             #----  
             if(self.analysis_stopper.getShouldStop()):
                 self.analysis_stopper.setShouldStop(False)
@@ -169,7 +182,7 @@ class Analysis_Runner(QRunnable):
         #---- Search algorithm from PyORBIT native package
         searchAlgorithm = SimplexSearchAlgorithm()
         
-        maxIter = 100
+        maxIter = self.simplex_iter
         solverStopper = SolveStopperFactory.maxIterationStopper(maxIter)
         
         #max_time = 0.04
@@ -198,7 +211,7 @@ class Analysis_Runner(QRunnable):
         #----- this will set the trial point for best score to the harmonic_data
         trialPoint = solver.getScoreboard().getBestTrialPoint()
         best_score = scorer.getScore(trialPoint)
-        return (best_score,scorer)
+        return (best_score,trialPoint)
 
 class CavityParamsScorer_eKinOut(Scorer):
     """
