@@ -28,8 +28,6 @@ import epics
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Slot, Signal
 
-from .energy_meter_lib import EnergyMeter
-
 from statistics_lib.statistics import fitCosineFunc
 
 #------------------------------------------------------------------------
@@ -68,6 +66,7 @@ class Analysis_Runner(QRunnable):
         self.cavs_phase_scan_cntrl = self.scan_analysis_cntrl.cavs_phase_scan_cntrl
         self.cavs_scan_cntrl = self.cavs_phase_scan_cntrl.cavs_scan_cntrl
         self.lace_scl_wizard = self.cavs_phase_scan_cntrl.lace_scl_wizard
+        self.energy_meter = self.lace_scl_wizard.energy_meter
         self.signals = self.scan_analysis_cntrl.analysis_worker_signals
         #--------------------------------------
         self.cavs_table_view = self.scan_analysis_cntrl.cavs_table_view
@@ -113,7 +112,23 @@ class Analysis_Runner(QRunnable):
                 cav_wrapper.isAnalyzed = False
                 continue
             self.signals.analysis_data_changed.emit(("table_selection_set",cav_ind))
-            #---- perform analysis
+            #------------------------------------------------------------------
+            #---- Here we start analysis of full array of BPMs data to get
+            #---- functions eKinOut vs cavity phase. We will consider set of 
+            #---- BPMs for each cavity phase and use the energy meter to get
+            #---- eKinOut for this phase
+            #------------------------------------------------------------------
+            eKin_out_guess = cav_wrapper.eKin_out
+            if(cav_start.find("CCL") >= 0):
+                eKin_out_guess = 185.6
+            #---- calculation of cav_wrapper.eKin_out_func from BPMs' data
+            self.phaseScanAnalysis(eKin_out_guess,cav_wrapper)     
+            #------------------------------------------------------------------
+            #---- Performing analysis - from here we assume that cav_wrapper
+            #---- has eKin_out_func with data eKinOut vs cavity phase
+            #---- We will use this function to get parameters of cavity model
+            #---- and eKinOut for the next cavity as eKinIn.
+            #------------------------------------------------------------------
             (E0TL,cav_phase_offset,eKin_in_guess) = fitCosineFunc(cav_wrapper.eKin_out_func,cav_wrapper.eKin_out_fit_func)
             #print ("debug  cav=",cav_wrapper.getAlias()," eKin_in = ",eKin_in_guess," E0TL =",E0TL," cav_phase_offset=",cav_phase_offset)
             #---- These are preliminary setting based on 1-st order harmonic of phase scan
@@ -212,6 +227,46 @@ class Analysis_Runner(QRunnable):
         trialPoint = solver.getScoreboard().getBestTrialPoint()
         best_score = scorer.getScore(trialPoint)
         return (best_score,trialPoint)
+        
+    def phaseScanAnalysis(self,eKin_guess,cav_wrapper):
+        """ 
+        Performs CCL4 phase scan analysis. Really, there is no scan, only
+        BPMs' phases and amplitudes measured several times. We just want to 
+        extract eKin_in and eKin_out values which are the same.
+        """
+        min_bpm_amp = self.bpm_min_amp_spin_box.value()
+        #---- bpm_amp_phase_dic[BPM_Wrapper.getAlias()] = (FunctionAmp,FunctionPhase)
+        bpm_amp_phase_dict = cav_wrapper.bpm_amp_phase_dict
+        #---- Collecting only BPMs with good data 
+        bpm_wrappers = []
+        for bpm_wrapper in cav_wrapper.bpm_wrappers:
+            (bpm_amp_func,bpm_phase_func) = bpm_amp_phase_dict[bpm_wrapper.getAlias()]
+            bpm_amp_min = bpm_amp_func.getMinY()
+            if(bpm_amp_min > min_bpm_amp and bpm_wrapper.isGood and bpm_wrapper.getPosition() > cav_wrapper.getPosition()):
+                bpm_wrappers.append(bpm_wrapper)
+        #-----------------------------------------------
+        cav_wrapper.eKin_out_func.clean()
+        n_cav_phase_points = bpm_amp_phase_dict[bpm_wrappers[0].getAlias()][1].getSize()
+        print ("debug cav=",cav_wrapper.getAlias()," n-phase-points =",n_cav_phase_points)
+        bpm_positions = []
+        bpm_offsets = []
+        cav_phases = []
+        for bpm_wrapper in bpm_wrappers:
+            bpm_positions.append(bpm_wrapper.getPosition())
+            bpm_offsets.append(bpm_wrapper.getPhaseOffset())
+        #-----------------------------------------------
+        for cav_phase_ind in range(n_cav_phase_points):
+            bpm_phases = []
+            cav_phase = bpm_amp_phase_dict[bpm_wrappers[0].getAlias()][1].x(cav_phase_ind)
+            for bpm_wrapper in bpm_wrappers:
+                bpm_phase = bpm_amp_phase_dict[bpm_wrapper.getAlias()][0].x(cav_phase_ind)
+                bpm_phases.append(bpm_phase)
+            res_arr = self.energy_meter.fitEnergyFromBPMsPhases(eKin_guess,bpm_positions,bpm_phases,bpm_offsets)
+            (eKin,eKin_err,phase_pos_func,phase_pos_fit_func) = res_arr
+            cav_wrapper.eKin_out_func.add(cav_phase,eKin,eKin_err)
+
+        
+            
 
 class CavityParamsScorer_eKinOut(Scorer):
     """

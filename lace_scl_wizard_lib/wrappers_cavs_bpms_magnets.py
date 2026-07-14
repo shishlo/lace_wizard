@@ -39,11 +39,11 @@ class Cavity_Wrapper:
         #---- Function eKin_Out and its fit ( cavity phase) for analysis
         self.eKin_out_func = Function()
         self.eKin_out_fit_func = Function()
-        #--- use or not in phase scan analysis: self.bpm_wrappers_useInPhaseAnalysis[bpm_wrapper,]
+        #--- use or not in phase scan analysis: self.bpm_wrappers_useInPhaseAnalysis[True,...]
         self.bpm_wrappers_useInPhaseAnalysis = []
         for bpm_wrapper in self.bpm_wrappers:
             self.bpm_wrappers_useInPhaseAnalysis.append(True)
-        #--- use or not in BPMs' amplitudes analysis: self.bpm_wrappers_useInAmpBPMs[bpm_wrapper,]
+        #--- use or not in BPMs' amplitudes analysis: self.bpm_wrappers_useInAmpBPMs[True,...]
         self.bpm_wrappers_useInAmpBPMs = []
         for bpm_wrapper in self.bpm_wrappers:
             self.bpm_wrappers_useInAmpBPMs.append(True)
@@ -103,6 +103,14 @@ class Cavity_Wrapper:
             self.bpm_amp_phase_dict[bpm_wrapper.getAlias()][1].clean()
         self.bpm_amp_phase_entrance_funcions[0].clean()
         self.bpm_amp_phase_entrance_funcions[1].clean()
+        #-------------------------------------------------------
+        self.bpm_wrappers_useInPhaseAnalysis = []
+        for bpm_wrapper in self.bpm_wrappers:
+            self.bpm_wrappers_useInPhaseAnalysis.append(True)
+        self.bpm_wrappers_useInAmpBPMs = []
+        for bpm_wrapper in self.bpm_wrappers:
+            self.bpm_wrappers_useInAmpBPMs.append(True)
+        #-------------------------------------------------------
         self.phaseDiffBPM01_func.clean()
         self.phaseDiffBPM01_fit_func.clean()
         self.eKin_out_func.clean()

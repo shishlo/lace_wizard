@@ -14,8 +14,6 @@ import epics
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Slot, Signal
 
-from .energy_meter_lib import EnergyMeter
-
 #------------------------------------------------------------------------
 #           Auxiliary SCAN classes and functions
 #------------------------------------------------------------------------   

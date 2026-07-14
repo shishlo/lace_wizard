@@ -3,6 +3,9 @@
 #   using the BPMs phases. The energy of the beam should
 #   constant constant for all BPMs involved.
 #------------------------------------------------------
+import time
+import math
+import sys
 
 from orbit.utils import phaseNearTargetPhaseDeg
 from orbit.utils import speed_of_light
@@ -139,8 +142,7 @@ class EnergyMeter:
         #---- polynomial
         return (eKin,eKin_err,bpm_wrappers,amp_pos_func,phase_pos_func,poly_func,bpm_wrappers,bpm_amp_phase_err_dict)
         
-        
-    def fitEnergyFromBPMsPhases(eKin_guess,bpm_positions,bpm_phases,bpm_offsets):
+    def fitEnergyFromBPMsPhases(self,eKin_guess,bpm_positions,bpm_phases,bpm_offsets):
         """
         Fit the energy using bpms phases, phase offsets, and positions arrays.
         Here we assume BPMs frequency equals to 402.5 MHz.
@@ -162,7 +164,7 @@ class EnergyMeter:
         pos_center = (bpm_positions[0] + bpm_positions[-1])/2
         phase_pos_func = Function()
         for bpm_ind in range(len(bpm_phases)):
-            bpm_phases[bpm_ind] = phaseNearTargetPhaseDeg(bpm_phases[bpm_ind] - bpm_offsets[bpm_ind])
+            bpm_phases[bpm_ind] = phaseNearTargetPhaseDeg(bpm_phases[bpm_ind] - bpm_offsets[bpm_ind],0.)
         phase_pos_func.add(bpm_positions[0] - pos_center,bpm_phases[0])
         for bpm_ind in range(1,len(bpm_phases)):
             pos_diff = bpm_positions[bpm_ind] - bpm_positions[bpm_ind-1]
@@ -172,7 +174,7 @@ class EnergyMeter:
         #---- Now we make a polynomial fit
         self.poly_fit.fitFunction(phase_pos_func)
         poly_func = self.poly_fit.getPolynomial()
-        [coef_arr,err_arr] = poly_fit.getCoefficientsAndErr()
+        [coef_arr,err_arr] = self.poly_fit.getCoefficientsAndErr()
         #---- Get energy from the slope
         coeff = coef_arr[1]
         coeff_err = err_arr[1]
