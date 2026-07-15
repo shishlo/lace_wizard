@@ -78,11 +78,14 @@ class XALtoSCL_TuneWizardUpdater:
             #print (st)
             #----- ekin Out values vs. cav. phases 
             cav_wrapper.eKin_out_func.clean()
+            cav_wrapper.eKin_out_fit_func.clean()
             cav_phase_arr = xal_cavity_wrapper.getCavity_PhaseArr()
             ekinOut_arr = xal_cavity_wrapper.eKin_Out_Arr()
+            ekinOut_fit_arr = xal_cavity_wrapper.eKin_Out_Arr()
             if(len(cav_phase_arr) == len(ekinOut_arr) and len(cav_phase_arr) > 0):
                 for cav_phase_ind,cav_phase in enumerate(cav_phase_arr):
                     cav_wrapper.eKin_out_func.add(cav_phase,ekinOut_arr[cav_phase_ind])
+                    cav_wrapper.eKin_out_fit_func.add(cav_phase,ekinOut_fit_arr[cav_phase_ind])
                     #print ("debug cav_phase ind =",cav_phase_ind," phase=",cav_phase," eKinout=",ekinOut_arr[cav_phase_ind])
             if(cav_wrapper.isGood and cav_wrapper.eKin_out_func.getSize() > 0):
                 cav_wrapper.isMeasured = True
@@ -283,13 +286,19 @@ class SCL_Wizard_File_Reader:
             #---- eKinOut list from bpm data analysis
             xal_cav_wrapper.getCavity_PhaseArr().clear()
             xal_cav_wrapper.eKin_Out_Arr().clear()
+            xal_cav_wrapper.eKin_Out_Fit_Arr().clear()
             eKin_out_da =  cav_scan_da.childAdaptors("Ekin_Out_GD")[0]
             st_x_arr = eKin_out_da.childAdaptors("x")[0].stringValue("arr").split()
             st_y_arr = eKin_out_da.childAdaptors("y")[0].stringValue("arr").split()
+            eKin_out_fit_da =  cav_scan_da.childAdaptors("Ekin_Out_Fit_GD")[0]
+            st_y_fit_arr = eKin_out_fit_da.childAdaptors("y")[0].stringValue("arr").split()
             for ind,st_x in enumerate(st_x_arr):
                 st_y = st_y_arr[ind]
                 xal_cav_wrapper.getCavity_PhaseArr().append(float(st_x))
                 xal_cav_wrapper.eKin_Out_Arr().append(float(st_y))
+                if(cav_name != "AllOff"):
+                    st_fit_y = st_y_fit_arr[ind]
+                    xal_cav_wrapper.eKin_Out_Fit_Arr().append(float(st_fit_y))
             #----------------------------------------
             scan_data_da = cav_scan_da.childAdaptors("scan_data")[0]
             for bpm_da in scan_data_da.childAdaptors():
@@ -435,6 +444,7 @@ class XAL_CavityScanDataWrapper(NamedObject):
         #---- eKin_out list from BPMs phase analysis in SCL Wizard
         self.cav_phase_arr = []
         self.eKin_out_arr = []
+        self.eKin_out_fit_arr = []
         
     def clear(self):
         """ Removes all data"""
@@ -455,6 +465,7 @@ class XAL_CavityScanDataWrapper(NamedObject):
         #---- eKin_out list from BPMs phase analysis in SCL Wizard
         self.cav_phase_arr.clear()
         self.eKin_out_arr.clear()
+        self.eKin_out_fit_arr.clear()
         
     def isGood(self,is_good = None):
         if(is_good == None): return self.is_good
@@ -561,7 +572,10 @@ class XAL_CavityScanDataWrapper(NamedObject):
         
     def eKin_Out_Arr(self):
         return self.eKin_out_arr
-
+        
+    def eKin_Out_Fit_Arr(self):
+        return self.eKin_out_fit_arr        
+        
     def addScanPoint(self,bpm_name,cav_phase,bpm_phase,bpm_amp,bpm_x,bpm_y):
         """ We have to add points in order according to cav_phase """
         if(not (bpm_name in self.bpm_data_dict)):

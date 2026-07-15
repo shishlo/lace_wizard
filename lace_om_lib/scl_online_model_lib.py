@@ -52,7 +52,7 @@ def getBPM_Position_Dict(accLattice):
                 return node
         return None     
     #-------------------------------------------------
-    bpms = accLattice.getNodesForSubstring("BPM","drift")
+    bpms = accLattice.getNodesForSubstring("BPM","drift")[:]
     node_pos_dict = accLattice.getNodePositionsDict()
     bpm_pos_dict = {}
     for bpm in bpms:
@@ -83,9 +83,9 @@ def getBPM_Position_Dict(accLattice):
                 #print ("Debug   Inside BPM found name=",bpm.getName(),"  quad=",quad.getName())
                 break
     #----- sorting BPMs according to the position
-    sorted(bpms, key=lambda bpm : bpm_pos_dict[bpm])
     for bpm in bpms:
         bpm.setPosition(bpm_pos_dict[bpm])
+    bpms = sorted(bpms, key= lambda bpm : float(bpm.getPosition()))
     return (bpms,bpm_pos_dict)
     
 def setUpQuadFieldsFromFile(file_name,quads):
@@ -879,7 +879,7 @@ class SCL_Online_Model:
         bunch.deleteAllParticles()
         bunch_tmp = bunch
         if(len(model_cavs) == 0): return
-        sorted(model_cavs, key=lambda  model_cav: model_cav.getPosition())
+        model_cavs = sorted(model_cavs, key=lambda  model_cav: model_cav.getPosition())
         cav_start_ind = self.model_cavs.index(model_cavs[0])
         cav_stop_ind = self.model_cavs.index(model_cavs[-1])
         cav_synch_phase_dict = dict(cav_synch_phase_dict)

@@ -28,7 +28,7 @@ import epics
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Slot, Signal
 
-from statistics_lib.statistics import fitCosineFunc
+from statistics_lib.statistics import fitCosineFunc, calculateAvgErr
 
 #------------------------------------------------------------------------
 #           Auxiliary SCAN classes and functions
@@ -59,7 +59,7 @@ class Analysis_Runner(QRunnable):
     """ 
     It performs the analysis of scan data for selected or all cavities. 
     """
-    def __init__(self,scan_analysis_cntrl,cav_wrappers, simplex_iter = 50):
+    def __init__(self,scan_analysis_cntrl,cav_wrappers, simplex_iter = 200):
         QRunnable.__init__(self)
         self.scan_analysis_cntrl = scan_analysis_cntrl
         self.cav_wrappers = cav_wrappers        
@@ -150,7 +150,7 @@ class Analysis_Runner(QRunnable):
             #---- the real Cosine Fit for cav_wrapper.eKin_out_func
             cav_wrapper.setModelCavityPhaseOffset(0.)
             cav_wrapper.eKin_in = self.cavs_data_analysis_table_model.cav_wrappers[cav_ind-1].eKin_out
-            scorer = CavityParamsScorer_eKinOut(cav_wrapper,cav_wrapper.eKin_in)
+            scorer = CavityParamsScorer_eKinOut(cav_wrapper)
             #---- Let's get approximate sin-like eKinOut vs cav. phase function using the model
             #---- We will use E0TL_appr to correct cavity model amplitude according the E0TL_appr and cav_wrapper.E0TL
             scorer.calcModel_eKinOut_Arr(cav_wrapper.eKin_in)
@@ -169,7 +169,8 @@ class Analysis_Runner(QRunnable):
             eKin_out_appr_model_func = scorer.update_eKinOutFitFunction()
             #---- Let's fit the cavity model parameters 
             best_score, trialPoint = self.performCavityParamsFitting_eKin(scorer,cav_wrapper.eKin_in)
-            [model_cav_amp,model_cav_phase_offset] = trialPoint.getVariableProxyValuesArr()
+            [model_cav_amp,model_cav_phase_offset,eKin_in_fitted] = trialPoint.getVariableProxyValuesArr()
+            cav_wrapper.eKin_in = eKin_in_fitted
             print ("debug  cav=",cav_wrapper.getAlias()," model_cav_amp,model_cav_phase_offset=",[model_cav_amp,model_cav_phase_offset])
             #print ("debug  cav=",cav_wrapper.getAlias(), "best score = ",math.sqrt(best_score))
             #----  
@@ -264,22 +265,19 @@ class Analysis_Runner(QRunnable):
             (eKin,eKin_err,phase_pos_func,phase_pos_fit_func) = res_arr
             cav_wrapper.eKin_out_func.add(cav_phase,eKin,eKin_err)
 
-        
-            
-
 class CavityParamsScorer_eKinOut(Scorer):
     """
     The implementation of the abstract Score class 
     as eKinOut(cav_phase) vs cavity's parameters (amp., phase offset) scorer 
     between BPMs' data and the cavity model.
     """
-    def __init__(self,cav_wrapper,eKinIn):
+    def __init__(self,cav_wrapper):
         self.cav_wrapper = cav_wrapper      
         self.model_cav = self.cav_wrapper.model_cav
-        self.eKinIn = eKinIn
         self.eKin_out_func = self.cav_wrapper.eKin_out_func
         self.eKin_out_fit_func = self.cav_wrapper.eKin_out_fit_func
         (self.cav_phase_arr,self.eKInOut_BPMs_arr,error_arr) = self.eKin_out_func.getXYErrLists()
+        self.eKinIn = calculateAvgErr(self.eKInOut_BPMs_arr)[0]
         self.eKInOut_model_arr = []
         
     def getCavityWrapper(self):
@@ -287,6 +285,9 @@ class CavityParamsScorer_eKinOut(Scorer):
         
     def getModel_eKinOut_Arr(self):
         return self.eKInOut_model_arr
+        
+    def get_eKinInFitted(self):
+        return self.eKinIn 
         
     def update_eKinOutFitFunction(self):
         if(len(self.cav_phase_arr) == len(self.eKInOut_model_arr)):
@@ -334,6 +335,7 @@ class CavityParamsScorer_eKinOut(Scorer):
         variableProxy_arr = []
         variableProxy_arr.append(VariableProxy("amp",amp,0.01*amp))
         variableProxy_arr.append(VariableProxy("phaseOffset",cav_phase_offset,1.0))
+        variableProxy_arr.append(VariableProxy("eKinIn",self.eKinIn,0.5))
         #-------------------
         trialPoint = TrialPoint()
         for variableProxy in variableProxy_arr:
@@ -347,6 +349,7 @@ class CavityParamsScorer_eKinOut(Scorer):
         value_arr = trialPoint.getVariableProxyValuesArr()
         amp = value_arr[0]
         cav_phase_offset = value_arr[1]
+        self.eKinIn = value_arr[2]
         self.model_cav.setModelAmp(amp)
         self.model_cav.setCavityPhaseOffset(cav_phase_offset)
         self.calcModel_eKinOut_Arr(self.eKinIn)

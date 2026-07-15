@@ -53,6 +53,7 @@ class LACE_SCL_Wizard:
 
         #---- CCL4-SCL-HEBT1-HEBT2 PyORBIT online model
         xml_lattice_file_name = "./sns_lattices/sns_sts_linac.xml"
+        xml_lattice_file_name = "./sns_lattices/sns_pup_linac.xml"
         acc_da = XmlDataAdaptor.adaptorForFile(xml_lattice_file_name)
         #seq_names = ["CCL4","SCLMed", "SCLHigh", "HEBT1", "HEBT2"]
         seq_names = ["CCL4","SCLMed", "SCLHigh", "HEBT1", "HEBT2"]
