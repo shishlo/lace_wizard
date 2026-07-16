@@ -55,7 +55,6 @@ class LACE_SCL_Wizard:
         xml_lattice_file_name = "./sns_lattices/sns_sts_linac.xml"
         xml_lattice_file_name = "./sns_lattices/sns_pup_linac.xml"
         acc_da = XmlDataAdaptor.adaptorForFile(xml_lattice_file_name)
-        #seq_names = ["CCL4","SCLMed", "SCLHigh", "HEBT1", "HEBT2"]
         seq_names = ["CCL4","SCLMed", "SCLHigh", "HEBT1", "HEBT2"]
         self.scl_om = SCL_Online_Model(acc_da,seq_names)
 

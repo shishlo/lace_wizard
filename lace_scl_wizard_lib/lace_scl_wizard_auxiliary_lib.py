@@ -30,7 +30,8 @@ def normilizeToOneFunction(func):
 
 def unWrapPhasesFunction(func):
     """
-    This function will un-wrap phases in Function around -180 - +180 deg 
+    This function will un-wrap phases in Function around -180 - +180 deg.
+    Phases in func should be in degrees.
     """
     if(func.getSize() == 0): return
     y0 = func.y(0)
@@ -74,88 +75,6 @@ def EstimateBPM_PhaseOffset(bpm_phase_model_func,bpm_phase_epics_func,bpm_amp_ep
         y += bpm_offset
         func.updatePoint(ind,y,err)
     return bpm_offset
-    
-def getCosineEstimation(func):
-    """
-    It returns estimation for phase offset and amplitude for A*cos(phase - 180. + offset) + avg_val.
-    because BPM phase minimum is a maximal acceleration.
-    """
-    if(func.getSize() < 10): return (0.,0.)
-    y_max = -1.0e+30
-    y_max_ind = -1
-    y_min = +1.0e+30
-    y_min_ind = -1
-    avg_val = 0.
-    for ind in range(func.getSize()):
-        y = func.y(ind)
-        avg_val += y 
-        if(y < y_min): 
-            y_min = y
-            y_min_ind = ind
-        if(y > y_max):
-            y_max = y
-            y_max_ind = ind
-    #---- estimation
-    amp = (y_max - y_min)/2.
-    phase_offset =  - phaseNearTargetPhaseDeg(func.x(y_max_ind) - 180.,0.)
-    avg_val /= func.getSize()
-    return (phase_offset,amp,avg_val)
-    
-class CosFittingScorer(Scorer):
-    """
-    The Scorer implementaion for A*cos(phase + offset)
-    """
-    def __init__(self,func):
-        self.func = func
-        (phase_offset,amp,avg_val) = getCosineEstimation(self.func)
-        self.amp = amp
-        self.phase_offset = phase_offset
-        self.avg_val = avg_val
-        self.amp_relative_step = 0.1
-        self.phase_abs_step = 5.0
-
-    def getTrialPoint(self):
-        variableProxy_arr = []
-        var = VariableProxy("A", self.amp , self.amp_relative_step*self.amp)
-        variableProxy_arr.append(var)
-        var = VariableProxy("phase_offset", self.phase_offset , self.phase_abs_step)
-        variableProxy_arr.append(var)
-        var = VariableProxy("avg_val", self.avg_val , self.phase_abs_step)
-        variableProxy_arr.append(var)
-        trialPoint = TrialPoint()
-        for variableProxy in variableProxy_arr:
-            trialPoint.addVariableProxy(variableProxy)
-        return trialPoint
-
-    def setCosFunction(self,trialPoint,model_func = None):
-        param_arr = trialPoint.getVariableProxyValuesArr()
-        amp = param_arr[0]
-        phase_offset = param_arr[1]
-        avg_val = param_arr[2]
-        if(model_func != None):
-            model_func.clean()
-            for phase_ind in range(self.func.getSize()):
-                phase = self.func.x(phase_ind)
-                fit_value = amp*math.cos((phase - 180. + phase_offset)*math.pi/180.) + avg_val
-                model_func.add(phase,fit_value)
-        return (amp,phase_offset,avg_val)
-
-    def getScore(self,trialPoint, print_info = False):
-        if(self.func.getSize() < 10): return 0.
-        param_arr = trialPoint.getVariableProxyValuesArr()
-        amp = param_arr[0]
-        phase_offset = param_arr[1]
-        avg_val = param_arr[2]
-        diff2 = 0.
-        for phase_ind in range(self.func.getSize()):
-            phase = self.func.x(phase_ind)
-            func_value = self.func.y(phase_ind)
-            fit_value = amp*math.cos((phase - 180. + phase_offset)*math.pi/180.) + avg_val
-            diff2 += (func_value - fit_value)**2
-            if(print_info):
-                print ("debug cav_phase =",phase," (func_value,fit_value)=",(func_value,fit_value)," diff=",(func_value - fit_value))
-        diff2 /= self.func.getSize()
-        return diff2
 
 def dumpFunctionToDA(func,func_da,name_da,py_x_format = "%12.5g",py_y_format = "%12.5g",use_err = False):
     txt_x_arr = ""
@@ -231,21 +150,5 @@ def readFunctionFromDA(func,func_root_da,name_da,use_err = False):
     if(err_arr != None):
         return (x_arr,y_arr,err_arr)
     return (x_arr,y_arr)
-
-#------------------------------------------------------
-#  SCL Online Model parameter fitting classes
-#------------------------------------------------------
-
-class FittingScoreListener(ScoreboardActionListener):
-    def __init__(self,scan_controller):
-        ScoreboardActionListener.__init__(self)
-        self.scan_controller = scan_controller
-        self.fitProgressBar = self.scan_controller.fitProgressBar
-            
-    def performAction(self,solver):
-        scoreBoard = solver.getScoreboard()
-        iteration = scoreBoard.getIteration()
-        trialPoint = scoreBoard.getBestTrialPoint()
-        self.scan_controller.fitProgressBar.setValue(iteration)
         
         

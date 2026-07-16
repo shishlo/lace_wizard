@@ -59,7 +59,7 @@ class Analysis_Runner(QRunnable):
     """ 
     It performs the analysis of scan data for selected or all cavities. 
     """
-    def __init__(self,scan_analysis_cntrl,cav_wrappers, simplex_iter = 200):
+    def __init__(self,scan_analysis_cntrl,cav_wrappers, simplex_iter = 100):
         QRunnable.__init__(self)
         self.scan_analysis_cntrl = scan_analysis_cntrl
         self.cav_wrappers = cav_wrappers        
@@ -241,11 +241,17 @@ class Analysis_Runner(QRunnable):
         bpm_amp_phase_dict = cav_wrapper.bpm_amp_phase_dict
         #---- Collecting only BPMs with good data 
         bpm_wrappers = []
-        for bpm_wrapper in cav_wrapper.bpm_wrappers:
+        bpm_wrappers_useInPhaseAnalysis = cav_wrapper.bpm_wrappers_useInPhaseAnalysis
+        for bpm_wrapper_ind, bpm_wrapper in enumerate(cav_wrapper.bpm_wrappers):          
             (bpm_amp_func,bpm_phase_func) = bpm_amp_phase_dict[bpm_wrapper.getAlias()]
             bpm_amp_min = bpm_amp_func.getMinY()
+            bpm_wrappers_useInPhaseAnalysis[bpm_wrapper_ind] = False
             if(bpm_wrapper.isGood and (bpm_amp_min > min_bpm_amp) and bpm_wrapper.getPosition() > cav_wrapper.getPosition()):
                 bpm_wrappers.append(bpm_wrapper)
+                bpm_wrappers_useInPhaseAnalysis[bpm_wrapper_ind] = True
+        #---- debugging ???????????????????????????/
+        for bpm_wrapper in bpm_wrappers:
+            print ("debug BPM = ",bpm_wrapper.getAlias())
         #-----------------------------------------------
         cav_wrapper.eKin_out_func.clean()
         n_cav_phase_points = bpm_amp_phase_dict[bpm_wrappers[0].getAlias()][1].getSize()
@@ -335,7 +341,7 @@ class CavityParamsScorer_eKinOut(Scorer):
         variableProxy_arr = []
         variableProxy_arr.append(VariableProxy("amp",amp,0.01*amp))
         variableProxy_arr.append(VariableProxy("phaseOffset",cav_phase_offset,1.0))
-        variableProxy_arr.append(VariableProxy("eKinIn",self.eKinIn,0.5))
+        variableProxy_arr.append(VariableProxy("eKinIn",self.eKinIn,0.2))
         #-------------------
         trialPoint = TrialPoint()
         for variableProxy in variableProxy_arr:

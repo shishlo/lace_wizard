@@ -47,10 +47,115 @@ def getBPM_Position_Dict(accLattice):
     Retuns bpm_list and bpm_pos_dict - ( bpm_list,bpm_pos_dict)
     """
     def getBPM(children):
+        """ 
+        This internal function returns the first BPM inside 
+        array of nodes - children. Actually, it is not BPM a node with
+        BPM letters inside name.
+        """
         for node in children:
             if(node.getName().find("BPM") >= 0):
                 return node
-        return None     
+        return None
+        
+    def fixBPMinQuadPosition(quad):
+        """
+        This function fixes the position of the BPM inside the quad by
+        changing lengths of parts of the quad. It is destroying the simplexity
+        of tracking, because each part of the quad has internal 4 sub-parts.
+        Initially, the quad is divided into equal parts, and BPM are set 
+        to one of them which is nearest to BPM position into the lattice XML
+        file.
+        """
+        bpm_node = None
+        bpm_index = None
+        n_parts = quad.getnParts()
+        n_bpm_counts = 0
+        bpm_place_in_part = None
+        for ind in range(n_parts):
+            children = quad.getChildNodes(Quad.BODY,part_index = ind,place_in_part = Quad.BEFORE)
+            bpm = getBPM(children)
+            if(bpm != None):
+                bpm_node = bpm
+                bpm_index = ind
+                n_bpm_counts += 1
+                bpm_place_in_part = Quad.BEFORE
+            children = quad.getChildNodes(Quad.BODY,part_index = ind,place_in_part = Quad.AFTER)
+            bpm = getBPM(children)
+            if(bpm != None):
+                bpm_node = bpm
+                bpm_index = ind
+                n_bpm_counts += 1
+                bpm_place_in_part = Quad.AFTER
+        #---- if no BPM found return
+        if(n_bpm_counts == 0): return
+        if(n_bpm_counts > 1):
+            print ("======================================")
+            print ("debug quad=",quad.getName()," has more than 1 BMPs. N BPMs =",n_bpm_counts)
+            print ("debug only last one will be used BPM=",bpm_node.getName())
+            print ("======================================")
+        #---- Now we modify the structure of length of parts
+        quad_da = quad.getDataAdaptor()
+        bpm_da = bpm_node.getDataAdaptor()
+        if(quad_da == None or bpm_da == None):
+            print ("======================================")
+            print ("debug quad=",quad.getName()," does not have DataAdaptor. Lattice XML file has an old style.")
+            print ("debug BPM=",bpm_node.getName()," does not have DataAdaptor. Lattice XML file has an old style.")
+            print ("debug There will be no BPM postion correction.")
+            print ("======================================")
+            return
+        quad_pos = quad_da.doubleValue("pos")
+        bpm_pos = bpm_da.doubleValue("pos")           
+        quad_length = quad.getLength()
+        part_length_arr = []
+        part_center_pos_arr = []
+        pos = quad_pos - quad_length/2
+        for part_ind in range(n_parts):
+            part_length = quad.getLength(part_ind)
+            part_length_arr.append(part_length)
+            pos += part_length/2 
+            part_center_pos_arr.append(pos)
+            pos += part_length/2
+        #---- Let's check positions of BPM and Quad
+        pos_min = part_center_pos_arr[bpm_index] - quad.getLength(bpm_index)/2
+        pos_max = part_center_pos_arr[bpm_index] + quad.getLength(bpm_index)/2
+        if(bpm_pos >= pos_min and bpm_pos <= pos_max):
+            #print ("debug bpm=",bpm_node.getName()," pos = ",bpm_pos," quad min,max= ",(pos_min,pos_max)," bpm_index=",bpm_index," n_parts=",n_parts," place=",bpm_place_in_part)
+            if(bpm_index != 0 and bpm_index != n_parts - 1):
+                if(bpm_place_in_part == Quad.BEFORE):
+                    delta = bpm_pos - pos_min
+                    part_legth = quad.getLength(bpm_index - 1)
+                    quad.setLength(part_legth + delta,bpm_index-1)
+                    part_legth = quad.getLength(bpm_index)
+                    quad.setLength(part_legth - delta,bpm_index)
+                else:
+                    delta = bpm_pos - pos_min
+                    part_legth = quad.getLength(bpm_index)
+                    quad.setLength(part_legth - delta,bpm_index)
+                    part_legth = quad.getLength(bpm_index+1)
+                    quad.setLength(part_legth + delta,bpm_index+1) 
+            elif(bpm_index == 0):
+                if(bpm_place_in_part == Quad.BEFORE):
+                    children = quad.getChildNodes(Quad.BODY,part_index = bpm_index,place_in_part = Quad.BEFORE)
+                    children.remove(bpm_node)
+                    children = quad.getChildNodes(Quad.BODY,part_index = bpm_index,place_in_part = Quad.AFTER)
+                    children.append(bpm_node)
+                delta = pos_max - bpm_pos
+                part_legth = quad.getLength(bpm_index)
+                quad.setLength(part_legth - delta,bpm_index)
+                part_legth = quad.getLength(bpm_index+1)
+                quad.setLength(part_legth + delta,bpm_index+1)
+            elif(bpm_index == n_parts - 1):
+                if(bpm_place_in_part == Quad.AFTER):
+                    children = quad.getChildNodes(Quad.BODY,part_index = bpm_index,place_in_part = Quad.AFTER)
+                    children.remove(bpm_node)
+                    children = quad.getChildNodes(Quad.BODY,part_index = bpm_index,place_in_part = Quad.BEFORE)
+                    children.append(bpm_node)
+                delta = bpm_pos - pos_min
+                part_legth = quad.getLength(bpm_index - 1)
+                quad.setLength(part_legth + delta,bpm_index-1)
+                part_legth = quad.getLength(bpm_index)
+                quad.setLength(part_legth - delta,bpm_index)
+  
     #-------------------------------------------------
     bpms = accLattice.getNodesForSubstring("BPM","drift")[:]
     node_pos_dict = accLattice.getNodePositionsDict()
@@ -66,6 +171,7 @@ def getBPM_Position_Dict(accLattice):
         n_parts = quad.getnParts()
         pos = quad_pos
         #print ("debug quad=",quad.getName()," pos=",pos)
+        fixBPMinQuadPosition(quad)
         for ind in range(n_parts):
             children = quad.getChildNodes(Quad.BODY,part_index = ind,place_in_part = Quad.BEFORE)
             bpm = getBPM(children)
