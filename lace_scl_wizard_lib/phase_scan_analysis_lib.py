@@ -119,11 +119,31 @@ class Analysis_Runner(QRunnable):
             #---- eKinOut for this phase.
             #---- As the result we will get cav_wrapper.eKin_out_func function.
             #------------------------------------------------------------------
-            eKin_out_guess = cav_wrapper.eKin_out
+            eKin_in_guess = cav_wrapper.eKin_in
             if(cav_start.find("CCL") >= 0):
-                eKin_out_guess = 185.6
+                eKin_in_guess = 185.6
             #---- calculation of cav_wrapper.eKin_out_func from BPMs' data
-            self.phaseScanAnalysis(eKin_out_guess,cav_wrapper)     
+            eKin_out_local_func = self.phaseScanAnalysis(eKin_in_guess,cav_wrapper)
+            (x_arr,y_arr,err_arr) = eKin_out_local_func.getXYErrLists()
+            #???????????????????????????????????????????????
+            print ("debug --------------------------------------------")
+            print ("debug cav=",cav_wrapper.getAlias())
+            if(len(x_arr) != cav_wrapper.eKin_out_func.getSize()):
+                print ("debug xal cav. phase points=",cav_wrapper.eKin_out_func.getSize())
+                print ("debug pyorbit3 phase points=",len(x_arr))
+            else:
+                print ("debug cav_phase xal_eKin err  eKin err   delta")
+                for ind in range(len(x_arr)):
+                    st  = "%+8.2f "%x_arr[ind]
+                    st += " %9.3f "%cav_wrapper.eKin_out_func.y(ind)
+                    st += " %5.3f "%cav_wrapper.eKin_out_func.err(ind)
+                    st += "  %9.3f "%y_arr[ind]
+                    st += " %5.3f "%err_arr[ind]
+                    st += "    %5.3f "%(y_arr[ind]-cav_wrapper.eKin_out_func.y(ind))
+                    print (st)
+            print ("debug --------------------------------------------")
+            #???????????????????????????????????????????????
+            cav_wrapper.eKin_out_func.initFromLists(x_arr,y_arr,err_arr)
             #------------------------------------------------------------------
             #---- Performing analysis - from here we assume that cav_wrapper
             #---- has eKin_out_func with data eKinOut vs cavity phase
@@ -249,11 +269,8 @@ class Analysis_Runner(QRunnable):
             if(bpm_wrapper.isGood and (bpm_amp_min > min_bpm_amp) and bpm_wrapper.getPosition() > cav_wrapper.getPosition()):
                 bpm_wrappers.append(bpm_wrapper)
                 bpm_wrappers_useInPhaseAnalysis[bpm_wrapper_ind] = True
-        #---- debugging ???????????????????????????/
-        for bpm_wrapper in bpm_wrappers:
-            print ("debug BPM = ",bpm_wrapper.getAlias())
         #-----------------------------------------------
-        cav_wrapper.eKin_out_func.clean()
+        eKin_out_local_func = Function()
         n_cav_phase_points = bpm_amp_phase_dict[bpm_wrappers[0].getAlias()][1].getSize()
         bpm_positions = []
         bpm_offsets = []
@@ -269,7 +286,23 @@ class Analysis_Runner(QRunnable):
                 bpm_phases.append(bpm_phase)
             res_arr = self.energy_meter.fitEnergyFromBPMsPhases(eKin_guess,bpm_positions,bpm_phases,bpm_offsets)
             (eKin,eKin_err,phase_pos_func,phase_pos_fit_func) = res_arr
-            cav_wrapper.eKin_out_func.add(cav_phase,eKin,eKin_err)
+            #----- ????????????????????????????????????????
+            if(cav_wrapper.getAlias() == "Cav32a" and abs(cav_phase - 180.) < 0.1):
+                print ("debug ============ cav=",cav_wrapper.getAlias()," cav. phase=",cav_phase)
+                print ("debug n BPMs' pos. =",phase_pos_func.getSize())
+                print ("debug n   BPMs     =",len(bpm_wrappers))
+                for bpm_ind in range(phase_pos_func.getSize()):
+                    st  = " bpm = " + bpm_wrappers[bpm_ind].getAlias()
+                    st += " pos = %8.3f"%phase_pos_func.x(bpm_ind)
+                    st += " phase = %+8.2f"%phase_pos_func.y(bpm_ind)
+                    st += " fit = %+8.2f"%phase_pos_fit_func.y(bpm_ind)
+                    st += "    diff = %+8.2f"%(phase_pos_func.y(bpm_ind) - phase_pos_fit_func.y(bpm_ind))
+                    print ("debug ",st)
+            
+                print ("debug =====================================") 
+            #----- ????????????????????????????????????????
+            eKin_out_local_func.add(cav_phase,eKin,eKin_err)
+        return eKin_out_local_func
 
 class CavityParamsScorer_eKinOut(Scorer):
     """

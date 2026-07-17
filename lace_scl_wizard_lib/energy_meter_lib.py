@@ -162,10 +162,21 @@ class EnergyMeter:
         #---- Let's correct phases with offsets, and add/subsract 360. deg
         #---- to make phase vs position almost linear.
         pos_center = (bpm_positions[0] + bpm_positions[-1])/2
-        phase_pos_func = Function()
         for bpm_ind in range(len(bpm_phases)):
             bpm_phases[bpm_ind] = phaseNearTargetPhaseDeg(bpm_phases[bpm_ind] - bpm_offsets[bpm_ind],0.)
-        phase_pos_func.add(bpm_positions[0] - pos_center,bpm_phases[0])
+        #---- ???????????????????????????
+        coeff_guess_avg = 0.
+        for bpm_ind in range(1,len(bpm_phases)):
+            delta_pos = bpm_positions[bpm_ind] - bpm_positions[bpm_ind-1]
+            phase_guess0 = bpm_phases[bpm_ind -1]
+            phase_guess1 = phase_guess0 + coeff_guess*delta_pos
+            phase_guess1 = phaseNearTargetPhaseDeg(bpm_phases[bpm_ind],phase_guess1)
+            delta_phase = phase_guess1 - phase_guess0
+            coeff_guess_avg += delta_phase/delta_pos
+        coeff_guess = coeff_guess_avg/(len(bpm_phases) - 1)
+        #---- ???????????????????????????
+        phase_pos_func = Function()
+        phase_pos_func.add(bpm_positions[0] - pos_center, bpm_phases[0])
         for bpm_ind in range(1,len(bpm_phases)):
             pos_diff = bpm_positions[bpm_ind] - bpm_positions[bpm_ind-1]
             phase_guess = bpm_phases[bpm_ind -1] + coeff_guess*pos_diff
