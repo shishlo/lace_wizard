@@ -48,7 +48,7 @@ def getCosineEstimation(func):
     It returns estimation for phase offset and amplitude for A*cos(phase - 180. + offset) + avg_val.
     because BPM phase minimum is a maximal acceleration.
     """
-    if(func.getSize() < 10): return (0.,0.)
+    if(func.getSize() < 10): return (0.,0.,0.)
     y_max = -1.0e+30
     y_max_ind = -1
     y_min = +1.0e+30

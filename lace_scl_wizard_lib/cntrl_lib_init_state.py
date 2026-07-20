@@ -173,9 +173,12 @@ class CavsDataTableModel(LACE_DataTableModel):
         for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):
             name_item = QStandardItem(cav_wrapper.getAlias())
             pos_item = QStandardItem("%7.3f"%cav_wrapper.model_cav.getPosition())
+            pos_item.setTextAlignment(Qt.AlignmentFlag.AlignJustify)
             isGood_item = QStandardItem() ; isGood_item.setCheckable(True) ; isGood_item.setCheckState(Qt.Checked)
             epics_amp_item = QStandardItem()
+            epics_amp_item.setTextAlignment(Qt.AlignmentFlag.AlignJustify)
             epics_phase_item = QStandardItem()
+            epics_phase_item.setTextAlignment(Qt.AlignmentFlag.AlignJustify)
             measured_item = QStandardItem() ; measured_item.setCheckable(True) ; measured_item.setCheckState(Qt.Unchecked)
             analyzed_item = QStandardItem() ; analyzed_item.setCheckable(True) ; analyzed_item.setCheckState(Qt.Unchecked)
             measured_item.setEnabled(False)
@@ -211,14 +214,14 @@ class CavsDataTableModel(LACE_DataTableModel):
             if(not cav_wrapper.isGood):
                 cav_wrapper.modelAmp = 0.
                 cav_wrapper.model_cav.setModelAmp(cav_wrapper.modelAmp)
-            epics_amp_item = self.item(cav_ind,3) ; epics_amp_item.setText("%7.4f"%cav_wrapper.epicsAmpInit)
-            epics_phase_item = self.item(cav_ind,4) ; epics_phase_item.setText("%+6.1f"%cav_wrapper.epicsPhaseInit)
+            epics_amp_item = self.item(cav_ind,3) ; epics_amp_item.setText("%7.3f"%cav_wrapper.epicsAmpInit)
+            epics_phase_item = self.item(cav_ind,4) ; epics_phase_item.setText("%+7.2f"%cav_wrapper.epicsPhaseInit)
             self._updateBoolItem(cav_wrapper.isMeasured,self.item(cav_ind,5))
             self._updateBoolItem(cav_wrapper.isAnalyzed,self.item(cav_ind,6))
             model_amp_item  = self.item(cav_ind,7) ; model_amp_item.setText("%6.4f"%cav_wrapper.modelAmp)           
-            model_phase_item = self.item(cav_ind,8) ; model_phase_item.setText("%+6.1f"%cav_wrapper.modelPhase) 
+            model_phase_item = self.item(cav_ind,8) ; model_phase_item.setText("%+6.2f"%cav_wrapper.modelPhase) 
             model_coeff_amp_item = self.item(cav_ind,9) ; model_coeff_amp_item.setText("%6.4f"%cav_wrapper.modelCoeffToEpicsAmp)
-            phase_offset_item = self.item(cav_ind,10) ; phase_offset_item.setText("%+6.1f"%cav_wrapper.getModelCavityPhaseOffset())
+            phase_offset_item = self.item(cav_ind,10) ; phase_offset_item.setText("%+6.2f"%cav_wrapper.getModelCavityPhaseOffset())
             bpm1_item = self.item(cav_ind,11) ;  bpm1_item.setText("")
             if(cav_wrapper.bpm_wrapper0 != None):
                 if(cav_wrapper.bpm_wrapper0.isGood):

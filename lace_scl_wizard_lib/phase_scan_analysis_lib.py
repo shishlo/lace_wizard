@@ -202,6 +202,7 @@ class Analysis_Runner(QRunnable):
             best_score, trialPoint = self.performCavityParamsFitting_eKin(scorer,cav_wrapper.eKin_in)
             [model_cav_amp,model_cav_phase_offset,eKin_in_fitted] = trialPoint.getVariableProxyValuesArr()
             cav_wrapper.eKin_in = eKin_in_fitted
+            cav_wrapper.eKin_out_fit_delta_rms = math.sqrt(abs(best_score))
             #---- Let's update cav_wrapper.eKin_out_fit_func
             scorer.calcModel_eKinOut_Arr(cav_wrapper.eKin_in)
             scorer.update_eKinOutFitFunction()
@@ -248,6 +249,7 @@ class Analysis_Runner(QRunnable):
             cav_wrapper_next.eKin_out = 185.6
             cav_wrapper_next.eKin_out_func.clean()
             cav_wrapper_next.eKin_out_fit_func.clean()
+            cav_wrapper_next.eKin_out_fit_delta_rms = 0.
             
     def performCavityParamsFitting_eKin(self,scorer,eKinIn):
         """ Fitting is done using eKinOut(cav_phase) data from BPMs """

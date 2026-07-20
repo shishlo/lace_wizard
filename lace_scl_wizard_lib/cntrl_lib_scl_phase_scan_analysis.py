@@ -343,7 +343,8 @@ class CavsScanDataAnalysisTableModel(LACE_DataTableModel):
         #---- Sets the headers
         headers  = ["Cavity","Good","Done"]
         headers += ["E-In(MeV)","E-Out(MeV)",html.unescape("&delta;E(k/k-1)(keV)")]
-        headers += ["Model-E-In","Model-E-Out","CavAmp(MV)","CavAmp(%)"]
+        headers += [html.unescape("&delta;E-fit(keV)"),]
+        headers += ["E0TL[MeV]","Model-E-Out","CavAmp(MV)","CavAmp(%)"]
         headers += [html.unescape("&phi;-1stGap"),html.unescape("&delta;&phi;-synch")]
         self.setHorizontalHeaderLabels(headers)
         for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):
@@ -353,21 +354,24 @@ class CavsScanDataAnalysisTableModel(LACE_DataTableModel):
             name_item.setEditable(False)
             isGood_item.setEnabled(False)
             isDone_item.setEnabled(False)
-            eKinIn_item = QStandardItem();
-            eKinOut_item = QStandardItem();
-            delta_eKin_item = QStandardItem();
+            eKinIn_item = QStandardItem()
+            eKinOut_item = QStandardItem()
+            delta_eKin_item = QStandardItem()
             eKinIn_item.setTextAlignment(Qt.AlignmentFlag.AlignJustify)
             eKinOut_item.setTextAlignment(Qt.AlignmentFlag.AlignJustify)
             delta_eKin_item.setTextAlignment(Qt.AlignmentFlag.AlignJustify)
-            model_eKinIn_item = QStandardItem();
-            model_eKinOut_item = QStandardItem();
-            cav_amp_epics_item = QStandardItem();
-            cav_amp_model_item = QStandardItem();
-            phase_1st_gap_item = QStandardItem();
-            synch_phase_item = QStandardItem();
+            delta_fit_eKinOut_rms_item = QStandardItem()
+            delta_fit_eKinOut_rms_item.setTextAlignment(Qt.AlignmentFlag.AlignJustify)
+            e0tl_item = QStandardItem()
+            model_eKinOut_item = QStandardItem()
+            cav_amp_epics_item = QStandardItem()
+            cav_amp_model_item = QStandardItem()
+            phase_1st_gap_item = QStandardItem()
+            synch_phase_item = QStandardItem()
             row  = [name_item,isGood_item,isDone_item]
             row += [eKinIn_item,eKinOut_item,delta_eKin_item]
-            row += [model_eKinIn_item,model_eKinOut_item]
+            row += [delta_fit_eKinOut_rms_item,]
+            row += [e0tl_item,model_eKinOut_item]
             row += [cav_amp_epics_item,cav_amp_model_item]
             row += [phase_1st_gap_item,synch_phase_item]
             #print ("debug n item=",len(row))
@@ -387,14 +391,21 @@ class CavsScanDataAnalysisTableModel(LACE_DataTableModel):
             eKinIn = cav_wrapper.eKin_in
             eKinOut = cav_wrapper.eKin_out
             deltaE = 0.
-            if(cav_ind > 1):
+            if(cav_ind >= 1):
                 deltaE = eKinIn - self.cav_wrappers[cav_ind-1].eKin_out
-            eKinIn_item = self.item(cav_ind,3);
-            eKinOut_item = self.item(cav_ind,4);
-            delta_eKin_item = self.item(cav_ind,5);
+            eKin_out_fit_delta_rms = cav_wrapper.eKin_out_fit_delta_rms
+            E0TL = cav_wrapper.E0TL
+            #------------------------------------------------
+            eKinIn_item = self.item(cav_ind,3)
+            eKinOut_item = self.item(cav_ind,4)
+            delta_eKin_item = self.item(cav_ind,5)
             eKinIn_item.setText("%8.3f"%eKinIn)
             eKinOut_item.setText("%8.3f"%eKinOut)
             delta_eKin_item.setText("%8.3f"%(deltaE*1000))
+            delta_fit_eKinOut_rms_item = self.item(cav_ind,6)
+            delta_fit_eKinOut_rms_item.setText("%8.3f"%(eKin_out_fit_delta_rms*1000))
+            e0tl_item = self.item(cav_ind,7)
+            e0tl_item.setText("%8.3f"%(E0TL))
 
 #----------------------------------------------------------
 # Actions on events with buttons

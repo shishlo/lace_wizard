@@ -39,6 +39,7 @@ class Cavity_Wrapper:
         #---- Function eKin_Out and its fit ( cavity phase) for analysis
         self.eKin_out_func = Function()
         self.eKin_out_fit_func = Function()
+        self.eKin_out_fit_delta_rms = 0.
         #--- use or not in phase scan analysis: self.bpm_wrappers_useInPhaseAnalysis[True,...]
         self.bpm_wrappers_useInPhaseAnalysis = []
         for bpm_wrapper in self.bpm_wrappers:
@@ -115,6 +116,7 @@ class Cavity_Wrapper:
         self.phaseDiffBPM01_fit_func.clean()
         self.eKin_out_func.clean()
         self.eKin_out_fit_func.clean()
+        self.eKin_out_fit_delta_rms = 0.
         #-- design parameters will be defined after analysis of the phase scan data
         self.modelAmp = 0.
         self.modelPhase = 0.       
