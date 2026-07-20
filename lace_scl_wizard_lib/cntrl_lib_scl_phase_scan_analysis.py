@@ -358,6 +358,9 @@ class CavsScanDataAnalysisTableModel(LACE_DataTableModel):
             eKinIn_item = QStandardItem();
             eKinOut_item = QStandardItem();
             delta_eKin_item = QStandardItem();
+            eKinIn_item.setTextAlignment(Qt.AlignmentFlag.AlignJustify)
+            eKinOut_item.setTextAlignment(Qt.AlignmentFlag.AlignJustify)
+            delta_eKin_item.setTextAlignment(Qt.AlignmentFlag.AlignJustify)
             model_eKinIn_item = QStandardItem();
             model_eKinOut_item = QStandardItem();
             cav_amp_epics_item = QStandardItem();
@@ -381,6 +384,7 @@ class CavsScanDataAnalysisTableModel(LACE_DataTableModel):
         for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):
             #---- cavity is good
             self._updateBoolItem(cav_wrapper.isGood,self.item(cav_ind,1))
+            self._updateBoolItem(cav_wrapper.isAnalyzed,self.item(cav_ind,2))
             #---- update eKinIn eKinOut and deltaE(k/k-1)
             eKinIn = cav_wrapper.eKin_in
             eKinOut = cav_wrapper.eKin_out
@@ -392,7 +396,7 @@ class CavsScanDataAnalysisTableModel(LACE_DataTableModel):
             delta_eKin_item = self.item(cav_ind,5);
             eKinIn_item.setText("%8.3f"%eKinIn)
             eKinOut_item.setText("%8.3f"%eKinOut)
-            delta_eKin_item.setText("%8.3f"%deltaE)
+            delta_eKin_item.setText("%8.3f"%(deltaE*1000))
 
 #----------------------------------------------------------
 # Actions on events with buttons
@@ -413,7 +417,8 @@ class StartAnalysis_Action:
         analysis_runner = Analysis_Runner(self.scan_analysis_cntrl,cav_wrappers)
         analysis_worker_signals.analysis_data_changed.connect(self.scan_analysis_cntrl.scanDataUpdate)
         self.scan_analysis_cntrl.threadpool.start(analysis_runner)
-        print ("debug Starts the analysis for all or selected cavities. ")
+        #---- ????????????????
+        #print ("debug Starts the analysis for all or selected cavities. ")
         
     def performActionForSelected(self):
         self.scan_analysis_cntrl = self.upper_panel_cntrl.scan_analysis_cntrl
@@ -434,8 +439,9 @@ class StartAnalysis_Action:
                 cav_wrapper.cleanAllScanData()
                 continue
             cavs_list.append(cav_wrapper)
-        self._performAction(cavs_list)        
-        print ("debug start scans for selected cavities.")   
+        self._performAction(cavs_list)
+        #---- ????????????????
+        #print ("debug start scans analysis for selected cavities.")   
         
     def performAction(self):
         self.scan_analysis_cntrl = self.upper_panel_cntrl.scan_analysis_cntrl
@@ -444,13 +450,14 @@ class StartAnalysis_Action:
         row = 0
         if(len(QModelIndex_list) > 0):
             row = QModelIndex_list[0].row()
-        #---- We cannot start a second scan -------
+        #---- We cannot start a second scan analysis-------
         analysis_stopper = self.scan_analysis_cntrl.analysis_stopper
         if(analysis_stopper.getIsRunning()): return
         #------------------------------------------
         cav_wrappers = self.scan_analysis_cntrl.cav_wrappers[row:]
         self._performAction(cav_wrappers)
-        print ("debug Starts the phase scans for all cavities. ")
+        #---- ????????????????
+        #print ("debug Starts the phase scans for all cavities. ")
 
 class StopAnalysis_Action:
     """ Stop the analysis for all cavities. """ 
@@ -462,4 +469,5 @@ class StopAnalysis_Action:
         self.scan_analysis_cntrl = self.upper_panel_cntrl.scan_analysis_cntrl
         self.analysis_stopper = self.scan_analysis_cntrl.analysis_stopper
         self.analysis_stopper.setShouldStop(True)
-        print ("debug Stops the phase scans analysis. ")
+        #---- ????????????????
+        #print ("debug Stops the phase scans analysis. ")
