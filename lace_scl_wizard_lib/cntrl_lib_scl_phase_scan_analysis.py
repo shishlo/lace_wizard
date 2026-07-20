@@ -187,8 +187,6 @@ class Scan_Analysis_Cntrl:
             msg_txt = rest[0]
             self.upper_panel_cntrl.analysis_status_text.setText(msg_txt)
             return
-        if(update_type == "update_eKin_plot"):
-            cav_wrapper = rest[0]
         #---- Type of message - Scan status update
         if(update_type == "table_selection_clear"):
             self.cavs_table_view.clearSelection()
