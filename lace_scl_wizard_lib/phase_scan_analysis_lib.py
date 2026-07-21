@@ -209,6 +209,8 @@ class Analysis_Runner(QRunnable):
             #print ("debug  cav=",cav_wrapper.getAlias()," model_cav_amp,model_cav_phase_offset=",[model_cav_amp,model_cav_phase_offset])
             #print ("debug  cav=",cav_wrapper.getAlias(), "best score = ",math.sqrt(best_score))
             cav_wrapper.isAnalyzed = True
+            #---- Update information in the table for the cavity
+            self.signals.analysis_data_changed.emit(("table_cavity_data_cahnged",cav_wrapper))
             #----  
             if(self.analysis_stopper.getShouldStop()):
                 self.analysis_stopper.setShouldStop(False)

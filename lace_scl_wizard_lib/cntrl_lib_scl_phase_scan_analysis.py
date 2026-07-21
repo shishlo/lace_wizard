@@ -196,7 +196,11 @@ class Scan_Analysis_Cntrl:
             self.cavs_table_view.selectRow(cav_ind)
             return
         if(update_type == "table_changed"):
-            self.cavs_data_analysis_table_model.tableChanged() 
+            self.cavs_data_analysis_table_model.tableChanged()
+            return          
+        if(update_type == "table_cavity_data_cahnged"):
+            cav_wrapper = rest[0]
+            self.cavs_data_analysis_table_model._updateItemsFromData(cav_wrapper)
             return          
         return
         
@@ -382,11 +386,23 @@ class CavsScanDataAnalysisTableModel(LACE_DataTableModel):
     def handleItemChanged(self, item):
         pass
 
-    def _updateItemsFromData(self):
-        for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):
+    def _updateItemsFromData(self,cav_wrapper = None):
+        if(cav_wrapper == None):
+            for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):
+              self._updateItemsFromDataForCavity(cav_ind,cav_wrapper)  
+        else:
+            cav_ind = self.cav_wrappers.index(cav_wrapper)
+            self._updateItemsFromDataForCavity(cav_ind,cav_wrapper)
+            
+    def _updateItemsFromDataForCavity(self,cav_ind,cav_wrapper):
             #---- cavity is good
             self._updateBoolItem(cav_wrapper.isGood,self.item(cav_ind,1))
             self._updateBoolItem(cav_wrapper.isAnalyzed,self.item(cav_ind,2))
+            if(not cav_wrapper.isGood or (not cav_wrapper.isAnalyzed)):
+                for item_ind in range(3,self.columnCount()):
+                    item = self.item(cav_ind,item_ind)
+                    item.setText("")
+                return
             #---- update eKinIn eKinOut and deltaE(k/k-1)
             eKinIn = cav_wrapper.eKin_in
             eKinOut = cav_wrapper.eKin_out
@@ -406,7 +422,7 @@ class CavsScanDataAnalysisTableModel(LACE_DataTableModel):
             delta_fit_eKinOut_rms_item.setText("%8.3f"%(eKin_out_fit_delta_rms*1000))
             e0tl_item = self.item(cav_ind,7)
             e0tl_item.setText("%8.3f"%(E0TL))
-
+        
 #----------------------------------------------------------
 # Actions on events with buttons
 #----------------------------------------------------------
