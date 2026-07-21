@@ -117,6 +117,9 @@ class Analysis_Runner(QRunnable):
                 cav_wrapper.E0TL = 0.
                 cav_wrapper.eKin_in = cav_wrapper_previous.eKin_out
                 cav_wrapper.eKin_out = cav_wrapper_previous.eKin_out
+                if((cav_ind + 1) != len(self.cavs_data_analysis_table_model.cav_wrappers)):
+                    cav_wrapper_next = self.cavs_data_analysis_table_model.cav_wrappers[cav_ind+1]
+                    cav_wrapper_next.eKin_in = cav_wrapper.eKin_out
                 cav_wrapper.isAnalyzed = False
                 continue
             self.signals.analysis_data_changed.emit(("table_selection_set",cav_ind))
@@ -127,10 +130,9 @@ class Analysis_Runner(QRunnable):
             #---- eKinOut for this phase.
             #---- As the result we will get cav_wrapper.eKin_out_func function.
             #------------------------------------------------------------------
-            eKin_in_guess = 185.6
-            if(cav_start.find("CCL") < 0):
-                cav_wrapper_previous = self.cavs_data_analysis_table_model.cav_wrappers[cav_ind-1]
-                eKin_in_guess = cav_wrapper_previous.eKin_out
+            eKin_in_guess = cav_wrapper.eKin_in
+            if(cav_start.find("CCL") >= 0):
+                eKin_in_guess = 185.6
             #---- calculation of cav_wrapper.eKin_out_func from BPMs' data
             eKin_out_local_func = self.phaseScanAnalysis(eKin_in_guess,cav_wrapper)
             (x_arr,y_arr,err_arr) = eKin_out_local_func.getXYErrLists()
@@ -209,6 +211,9 @@ class Analysis_Runner(QRunnable):
             #print ("debug  cav=",cav_wrapper.getAlias()," model_cav_amp,model_cav_phase_offset=",[model_cav_amp,model_cav_phase_offset])
             #print ("debug  cav=",cav_wrapper.getAlias(), "best score = ",math.sqrt(best_score))
             cav_wrapper.isAnalyzed = True
+            if( (cav_ind + 1) != len(self.cavs_data_analysis_table_model.cav_wrappers)):
+                cav_wrapper_next = self.cavs_data_analysis_table_model.cav_wrappers[cav_ind+1]
+                cav_wrapper_next.eKin_in = cav_wrapper.eKin_out
             #---- Update information in the table for the cavity
             self.signals.analysis_data_changed.emit(("table_cavity_data_cahnged",cav_wrapper))
             #----  

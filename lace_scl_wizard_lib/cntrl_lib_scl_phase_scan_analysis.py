@@ -384,7 +384,12 @@ class CavsScanDataAnalysisTableModel(LACE_DataTableModel):
 
     @Slot("QStandardItem*")
     def handleItemChanged(self, item):
-        pass
+        col = item.column()
+        if(col != 3): return
+        cav_ind = item.row()
+        txt = item.text()
+        if(txt != ""):
+            self.cav_wrappers[cav_ind].eKin_in = float(txt)
 
     def _updateItemsFromData(self,cav_wrapper = None):
         if(cav_wrapper == None):
