@@ -349,7 +349,7 @@ class CavsScanDataAnalysisTableModel(LACE_DataTableModel):
         headers += ["E-In(MeV)","E-Out(MeV)",html.unescape("&delta;E(k/k-1)(keV)")]
         headers += [html.unescape("&delta;E-fit(keV)"),]
         headers += ["E0TL[MeV]","Model-E-Out","CavAmp(MV)","CavAmp(%)"]
-        headers += [html.unescape("&phi;-1stGap"),html.unescape("&delta;&phi;-synch")]
+        headers += [html.unescape("&phi;-1stGap"),html.unescape("&phi;-synch")]
         self.setHorizontalHeaderLabels(headers)
         for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):
             name_item = QStandardItem(cav_wrapper.getAlias())
@@ -411,23 +411,53 @@ class CavsScanDataAnalysisTableModel(LACE_DataTableModel):
             #---- update eKinIn eKinOut and deltaE(k/k-1)
             eKinIn = cav_wrapper.eKin_in
             eKinOut = cav_wrapper.eKin_out
+            eKinIn_item = self.item(cav_ind,3)
+            eKinOut_item = self.item(cav_ind,4)
+            eKinIn_item.setText("%8.3f"%eKinIn)
+            eKinOut_item.setText("%8.3f"%eKinOut)
+            #------------------------------------------------
+            if(cav_wrapper.getAlias().find("CCL4") >= 0):
+                for item_ind in range(5,self.columnCount()):
+                    item = self.item(cav_ind,item_ind)
+                    item.setText("")
+                return
+            #------------------------------------------------
             deltaE = 0.
             if(cav_ind >= 1):
                 deltaE = eKinIn - self.cav_wrappers[cav_ind-1].eKin_out
-            eKin_out_fit_delta_rms = cav_wrapper.eKin_out_fit_delta_rms
-            E0TL = cav_wrapper.E0TL
-            #------------------------------------------------
-            eKinIn_item = self.item(cav_ind,3)
-            eKinOut_item = self.item(cav_ind,4)
             delta_eKin_item = self.item(cav_ind,5)
-            eKinIn_item.setText("%8.3f"%eKinIn)
-            eKinOut_item.setText("%8.3f"%eKinOut)
             delta_eKin_item.setText("%8.3f"%(deltaE*1000))
+            #------------------------------------------------
+            eKin_out_fit_delta_rms = cav_wrapper.eKin_out_fit_delta_rms
             delta_fit_eKinOut_rms_item = self.item(cav_ind,6)
             delta_fit_eKinOut_rms_item.setText("%8.3f"%(eKin_out_fit_delta_rms*1000))
+            #------------------------------------------------
+            E0TL = cav_wrapper.E0TL
             e0tl_item = self.item(cav_ind,7)
             e0tl_item.setText("%8.3f"%(E0TL))
-        
+            #------------------------------------------------
+            eKin_model_out = cav_wrapper.eKin_model_out
+            eKin_model_out_item =self.item(cav_ind,8)
+            eKin_model_out_item.setText("%8.3f"%eKin_model_out)
+            #------------------------------------------------
+            #---- It is not real EPICS amplitude - it is 
+            #---- from cavity model after analysis
+            epics_amp = cav_wrapper.modelAmp*cav_wrapper.modelCoeffToEpicsAmp 
+            epics_amp_item = self.item(cav_ind,9)
+            epics_amp_item.setText("%8.3f"%(epics_amp))
+            #------------------------------------------------
+            model_amp = cav_wrapper.modelAmp
+            model_amp_item = self.item(cav_ind,10)
+            model_amp_item.setText("%8.3f"%(model_amp*100))
+            #------------------------------------------------
+            model_phase = cav_wrapper.modelPhase
+            model_phase_item = self.item(cav_ind,11)
+            model_phase_item.setText("%8.3f"%(model_phase))
+            #------------------------------------------------
+            acc_phase = cav_wrapper.synch_real_acc_phase
+            acc_phase_item = self.item(cav_ind,12)
+            acc_phase_item.setText("%8.3f"%(acc_phase))
+            
 #----------------------------------------------------------
 # Actions on events with buttons
 #----------------------------------------------------------

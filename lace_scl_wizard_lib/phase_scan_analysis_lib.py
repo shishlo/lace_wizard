@@ -117,9 +117,12 @@ class Analysis_Runner(QRunnable):
                 cav_wrapper.E0TL = 0.
                 cav_wrapper.eKin_in = cav_wrapper_previous.eKin_out
                 cav_wrapper.eKin_out = cav_wrapper_previous.eKin_out
+                cav_wrapper.eKin_model_in = cav_wrapper_previous.eKin_model_out
+                cav_wrapper.eKin_model_out = cav_wrapper_previous.eKin_model_out                
                 if((cav_ind + 1) != len(self.cavs_data_analysis_table_model.cav_wrappers)):
                     cav_wrapper_next = self.cavs_data_analysis_table_model.cav_wrappers[cav_ind+1]
                     cav_wrapper_next.eKin_in = cav_wrapper.eKin_out
+                    cav_wrapper_next.eKin_model_in = cav_wrapper.eKin_model_out
                 cav_wrapper.isAnalyzed = False
                 continue
             self.signals.analysis_data_changed.emit(("table_selection_set",cav_ind))
@@ -164,7 +167,15 @@ class Analysis_Runner(QRunnable):
             #---- and eKinOut for the next cavity as eKinIn.
             #------------------------------------------------------------------
             (E0TL,cav_phase_offset,eKin_in_guess) = fitCosineFunc(cav_wrapper.eKin_out_func,cav_wrapper.eKin_out_fit_func)
+            cav_wrapper.synch_real_acc_phase = phaseNearTargetPhaseDeg(cav_wrapper.epicsPhase - (180.-cav_phase_offset),0.)
             #print ("debug  cav=",cav_wrapper.getAlias()," eKin_in = ",eKin_in_guess," E0TL =",E0TL," cav_phase_offset=",cav_phase_offset)
+            #----?????????????????????????????
+            """
+            (amp,phase_offset,y_avg) = fitCosineFunc(cav_wrapper.phaseDiffBPM01_func)
+            print ("debug  cav=",cav_wrapper.getAlias()," y_avg = ",y_avg," Amp =",amp," phase_offset=",phase_offset)
+            print ("debug ----------------------------------------------------")
+            """
+            #----?????????????????????????????
             #---- These are preliminary setting based on 1-st order harmonic of phase scan
             cav_wrapper.E0TL = E0TL
             cav_wrapper.eKin_in = eKin_in_guess
@@ -174,6 +185,7 @@ class Analysis_Runner(QRunnable):
             if(cav_start.find("CCL") >= 0):
                 cav_wrapper.E0TL = 0.
                 cav_wrapper.eKin_out = cav_wrapper.eKin_in
+                cav_wrapper.eKin_model_out = cav_wrapper.eKin_in
                 cav_wrapper.setModelCavityPhaseOffset(0.)
                 cav_wrapper.isAnalyzed = True
                 continue
@@ -211,9 +223,16 @@ class Analysis_Runner(QRunnable):
             #print ("debug  cav=",cav_wrapper.getAlias()," model_cav_amp,model_cav_phase_offset=",[model_cav_amp,model_cav_phase_offset])
             #print ("debug  cav=",cav_wrapper.getAlias(), "best score = ",math.sqrt(best_score))
             cav_wrapper.isAnalyzed = True
+            cav_wrapper.modelAmp = cav_wrapper.model_cav.getModelAmp()
+            cav_wrapper.model_cav.setEPICS_CavityModelPhase(cav_wrapper.epicsPhase)
+            cav_wrapper.modelPhase =  phaseNearTargetPhaseDeg(cav_wrapper.model_cav.getModelPhase(),0.)     
+            cav_wrapper.modelCoeffToEpicsAmp =  cav_wrapper.model_cav.getModelCoeffToEpicsAmp()
+            #---- Tracking the synchronous particle through the model cavity
+            cav_wrapper.eKin_model_out = self.trackBunchThroughModel(cav_wrapper.eKin_model_in,cav_wrapper.epicsPhase,cav_wrapper)
             if( (cav_ind + 1) != len(self.cavs_data_analysis_table_model.cav_wrappers)):
                 cav_wrapper_next = self.cavs_data_analysis_table_model.cav_wrappers[cav_ind+1]
                 cav_wrapper_next.eKin_in = cav_wrapper.eKin_out
+                cav_wrapper_next.eKin_model_in = cav_wrapper.eKin_model_out
             #---- Update information in the table for the cavity
             self.signals.analysis_data_changed.emit(("table_cavity_data_cahnged",cav_wrapper))
             #----  
@@ -258,6 +277,13 @@ class Analysis_Runner(QRunnable):
             cav_wrapper_next.eKin_out_fit_func.clean()
             cav_wrapper_next.eKin_out_fit_delta_rms = 0.
             
+    def trackBunchThroughModel(self,eKinIn,epicsPhase,cav_wrapper):
+        """ 
+        Tracking synchronous particle through the cavity to calculate output energy 
+        """
+        (eKinOut_arr,timeOut_arr) = cav_wrapper.model_cav.trackEmptyBunch(eKinIn,[epicsPhase,])
+        return eKinOut_arr[0]
+
     def performCavityParamsFitting_eKin(self,scorer,eKinIn):
         """ Fitting is done using eKinOut(cav_phase) data from BPMs """
         trialPoint = scorer.getTrialPoint()

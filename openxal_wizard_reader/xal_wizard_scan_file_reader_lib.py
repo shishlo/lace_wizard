@@ -52,11 +52,13 @@ class XALtoSCL_TuneWizardUpdater:
             (bpm0_name,bpm1_name) = xal_cavity_wrapper.getBPMs01()
             cav_wrapper.eKin_in = xal_cavity_wrapper.eKin_In()
             cav_wrapper.eKin_out = xal_cavity_wrapper.eKin_Out()
+            cav_wrapper.eKin_model_out = xal_cavity_wrapper.eKin_Model_Out()
             if(cav_wrapper.getAlias() == "CCL4"):
                 cav_wrapper.eKin_in = 185.6
                 cav_wrapper.eKin_out = 185.6
             cav_wrapper.eKin_guess = cav_wrapper.eKin_out
             cav_wrapper.synch_acc_phase = xal_cavity_wrapper.realSynchPhase()
+            cav_wrapper.synch_real_acc_phase = cav_wrapper.synch_acc_phase
             cav_wrapper.epicsAmp = xal_cavity_wrapper.EPICS_Amp() 
             cav_wrapper.epicsPhase = xal_cavity_wrapper.EPICS_Phase()
             cav_wrapper.epicsAmpInit = xal_cavity_wrapper.EPICS_Amp()
@@ -260,7 +262,9 @@ class SCL_Wizard_File_Reader:
             phase_scan_harm_amp_err = params_da.doubleValue("phase_scan_harm_err")
             eKin_in = params_da.doubleValue("eKin_in")
             eKin_out = params_da.doubleValue("bpm_eKin_out")
+            eKin_model_out = params_da.doubleValue("model_eKin_out")
             #print ("debug cav = ",cav_name," cav. phase = %7.2f"%cav_epics_phase)
+            #print ("debug cav = ",cav_name," eKin_model_out = %8.3f"%eKin_model_out)
             #----- BPMs phase difference between bpm0 and bpm1 vs cavity phase
             bpm_phase_diff_da = cav_scan_da.childAdaptors("Phase_Diff_GD")[0]
             bpm_phase_diff_x_arr = [float(st) for st in bpm_phase_diff_da.childAdaptors("x")[0].stringValue("arr").split()]
@@ -283,6 +287,7 @@ class SCL_Wizard_File_Reader:
             xal_cav_wrapper.sinPhaseScanAmpErr(phase_scan_harm_amp_err)
             xal_cav_wrapper.eKin_In(eKin_in)
             xal_cav_wrapper.eKin_Out(eKin_out)
+            xal_cav_wrapper.eKin_Model_Out(eKin_model_out)
             #---- eKinOut list from bpm data analysis
             xal_cav_wrapper.getCavity_PhaseArr().clear()
             xal_cav_wrapper.eKin_Out_Arr().clear()
@@ -441,6 +446,7 @@ class XAL_CavityScanDataWrapper(NamedObject):
         self.phase_scan_harm_amp_err = 0.
         self.eKin_out = 0.
         self.eKin_in = 0.
+        self.eKin_model_out = 0.
         #---- eKin_out list from BPMs phase analysis in SCL Wizard
         self.cav_phase_arr = []
         self.eKin_out_arr = []
@@ -462,6 +468,7 @@ class XAL_CavityScanDataWrapper(NamedObject):
         self.phase_scan_harm_amp_err = 0.
         self.eKin_out = 0.
         self.eKin_in = 0.
+        self.eKin_model_out = 0.
         #---- eKin_out list from BPMs phase analysis in SCL Wizard
         self.cav_phase_arr.clear()
         self.eKin_out_arr.clear()
@@ -559,7 +566,7 @@ class XAL_CavityScanDataWrapper(NamedObject):
         return self.phase_scan_harm_amp_err
         
     def eKin_In(self,eKin_in = None):
-        """ Sets / gets the energy before cavity """
+        """ Sets / gets the energy (defined by BPMs) before cavity """
         if(eKin_in == None): return self.eKin_in
         self.eKin_in = eKin_in
         return self.eKin_in
@@ -569,6 +576,12 @@ class XAL_CavityScanDataWrapper(NamedObject):
         if(eKin_out == None): return self.eKin_out
         self.eKin_out = eKin_out
         return self.eKin_out
+        
+    def eKin_Model_Out(self,eKin_model_out = None):
+        """ Sets / gets the energy (calculated by model) after cavity """
+        if(eKin_model_out == None): return self.eKin_model_out
+        self.eKin_model_out = eKin_model_out
+        return self.eKin_model_out   
         
     def eKin_Out_Arr(self):
         return self.eKin_out_arr

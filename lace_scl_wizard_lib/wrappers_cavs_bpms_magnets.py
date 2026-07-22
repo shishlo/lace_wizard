@@ -63,15 +63,21 @@ class Cavity_Wrapper:
         #---- Results of the sin-like analysis: bpm phases vs. cav. phase, amplitude of sin in degrees 
         self.sin_phase_func_amp = 0.
         self.sin_phase_func_amp_err = 0.
-        #---- accelerating phase of the cavity: self.epicsPhase shift from cav. phase for min phase of BPMs
-        self.synch_acc_phase = -15.
-        #---- kinetic energies in MeV
+        #---- kinetic energies in MeV after analysis of BPMs data based eKinOut vs. cavity EPICS phase
         self.eKin_in = 185.6
         self.eKin_out = 185.6
         self.eKin_guess = 185.6
         self.eKin_guess_err = 0.
+        #---- beam energy for tracking through the whole model from CCL4 -> Cav32d
+        self.eKin_model_in = 185.6
+        self.eKin_model_out = 185.6       
         #---- E0TL parameter of simplified model
         self.E0TL = 0.
+        #---- accelerating phase of the cavity: self.epicsPhase shift from cav. phase for minimal phase of BPMs
+        #---- synch_acc_phase - accelaration phase from/for BPMs
+        #---- synch_real_acc_phase - from eKinOut vs. Cavity Phase analysis
+        self.synch_acc_phase = -15.0
+        self.synch_real_acc_phase = -15.0
         #---- EPICS connections, PV channels
         self.is_connected = False
         pv_name_start = ""
@@ -124,8 +130,18 @@ class Cavity_Wrapper:
         #---- Results of the sin-like analysis: bpm phases vs. cav. phase, amplitude of sin in degrees 
         self.sin_phase_func_amp = 0.
         self.sin_phase_func_amp_err = 0.
+        #---- kinetic energies in MeV after analysis of BPMs data based eKinOut vs. cavity EPICS phase
+        self.eKin_in = 185.6
+        self.eKin_out = 185.6
+        self.eKin_guess = 185.6
+        self.eKin_guess_err = 0.
         #---- accelerating phase of the cavity: self.epicsPhase shift from cav. phase for min phase of BPMs
-        self.synch_acc_phase = -15.     
+        self.synch_acc_phase = -15.
+        self.synch_real_acc_phase = -15.0
+        #---- beam energy for tracking through the whole model from CCL4 -> Cav32d
+        self.eKin_model_in = 185.6
+        self.eKin_model_out = 185.6           
+        
         
     def connectPVs(self):
         self.is_connected = True
