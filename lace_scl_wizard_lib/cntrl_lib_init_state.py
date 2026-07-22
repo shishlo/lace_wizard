@@ -347,7 +347,7 @@ class InitCavs_Action:
                 if(not cav_wrapper.connectPVs()): bad_cavs.append(cav_wrapper)
             for bpm_wrapper in bpm_wrappers:
                 if(not bpm_wrapper.connectPVs()): bad_bpms.append(bpm_wrapper)
-            time.sleep(0.5)
+            time.sleep(0.1)
         for cav_wrapper in bad_cavs:
             cav_wrapper.isGood = False
             cav_wrapper.cleanAllScanData() 
@@ -366,7 +366,7 @@ class InitCavs_Action:
                 bpm_wrapper.isGood = False
         self.cavs_data_table_model.tableChanged()
         self.bpms_data_table_model.tableChanged()
-        print ("debug init all")        
+        #print ("debug init all")        
       
     def performAction(self):
         cav_wrappers = self.cavs_state_cntrl.getCavWrappers()
@@ -403,7 +403,7 @@ class CleanCavs_Action:
         
     def performAction(self):
         self._performAction(self.cavs_state_cntrl.getCavWrappers())
-        print ("debug clean all")
+        #print ("debug clean all")
         
     def performActionForSelected(self):    
         cav_wrappers = self.cavs_state_cntrl.getCavWrappers()
@@ -420,7 +420,7 @@ class CleanCavs_Action:
                 continue
             cavs_list.append(cav_wrapper)
         self._performAction(cavs_list)        
-        print ("debug clean selected")   
+        #print ("debug clean selected")   
 
 class SetBPM12forAllCavs_Action:
     """ Sets BPM1 and BPM2 for all cavities """ 
@@ -461,7 +461,7 @@ class SetBPM12forAllCavs_Action:
                 self.cavs_data_table_model.tableChanged()
                 return
         self.cavs_data_table_model.tableChanged()
-        print ("debug set BPM 1,2 for all cavs.")
+        #print ("debug set BPM 1,2 for all cavs.")
         
 class SetBPM12forSelectedCavs_Action:
     """ Sets BPM1 or BPM2 for selected Cavities """ 
@@ -516,7 +516,7 @@ class SetBPM12forSelectedCavs_Action:
                 bpm_wrapper0 = cav_wrapper.bpm_wrapper0
                 cav_wrapper.bpm_wrapper0 = cav_wrapper.bpm_wrapper1
                 cav_wrapper.bpm_wrapper1 = bpm_wrapper0 
-        print ("debug set BPM1 for selected cavs.")
+        #print ("debug set BPM1 for selected cavs.")
         self.cavs_data_table_model.tableChanged()
         
 class BPMReadPhaseOffset_Action:
