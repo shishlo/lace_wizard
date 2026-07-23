@@ -104,14 +104,30 @@ class Analysis_Runner(QRunnable):
         min_bpm_amp = self.bpm_min_amp_spin_box.value()
         iter_count = 0
         time_start = time.time()  
-        self.signals.analysis_data_changed.emit(("table_selection_clear",))
+        #self.signals.analysis_data_changed.emit(("table_selection_clear",))
         for cav_local_ind,cav_wrapper in enumerate(self.cav_wrappers):
+            #---- May be we want to stop
+            if(self.analysis_stopper.getShouldStop()):
+                self.analysis_stopper.setShouldStop(False)
+                self.analysis_stopper.setIsRunning(False)
+                self.cleanAllDownstreamCavities(cav_wrapper)
+                msg_txt  = "Analysis stopped by user's request at cavity="
+                msg_txt += cav_wrapper.getAlias()
+                self.signals.analysis_data_changed.emit(("status_update",msg_txt))
+                self.signals.analysis_data_changed.emit(("table_selection_set",cav_ind))
+                self.signals.analysis_data_changed.emit(("table_changed",))
+                return
+             #---- cav index in the table
+            cav_ind = self.cavs_data_analysis_table_model.cav_wrappers.index(cav_wrapper)
+            self.signals.analysis_data_changed.emit(("table_selection_set",cav_ind))
+            #---- we will skip cavity without measured data
+            if(not cav_wrapper.isMeasured):
+                continue
+            #----------------------------------------------
             cav_start = cav_wrapper.getAlias()
-            scav_stop = self.cav_wrappers[-1].getAlias()
+            cav_stop = self.cav_wrappers[-1].getAlias()
             msg_txt = "Analysis cavity = " + cav_start + " to " + cav_stop
             self.signals.analysis_data_changed.emit(("status_update",msg_txt))
-            #---- cav index in the table
-            cav_ind = self.cavs_data_analysis_table_model.cav_wrappers.index(cav_wrapper)
             if(cav_wrapper.isGood == False):
                 cav_wrapper_previous = self.cavs_data_analysis_table_model.cav_wrappers[cav_ind-1]
                 cav_wrapper.E0TL = 0.
@@ -125,7 +141,6 @@ class Analysis_Runner(QRunnable):
                     cav_wrapper_next.eKin_model_in = cav_wrapper.eKin_model_out
                 cav_wrapper.isAnalyzed = False
                 continue
-            self.signals.analysis_data_changed.emit(("table_selection_set",cav_ind))
             #------------------------------------------------------------------
             #---- Here we start analysis of full array of BPMs data to get
             #---- functions eKinOut vs. cavity phase. We will consider set of 

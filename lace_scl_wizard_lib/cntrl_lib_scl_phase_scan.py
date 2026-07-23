@@ -348,9 +348,9 @@ class SetSyncPhase_Action:
             cavs_list.append(cav_wrapper)
         for cav_wrapper in cavs_list:
             cav_wrapper.synch_acc_phase = synch_phase
-        cav_selection_model.clearSelection()
+        #cav_selection_model.clearSelection()
         self.cavs_scan_cntrl.cavs_data_table_model.tableChanged()
-        print ("debug Sets syncronous accelerating phase.")
+        #print ("debug Sets syncronous accelerating phase.")
         
 
 class StartScan_Action:
@@ -370,7 +370,7 @@ class StartScan_Action:
         phase_scan_runner = PhaseScan_Runner(self.cavs_scan_cntrl,cav_wrappers)
         scan_worker_signals.scan_data_changed.connect(self.cavs_scan_cntrl.scanDataUpdate)
         self.cavs_scan_cntrl.threadpool.start(phase_scan_runner)
-        print ("debug Starts the phase scans for all or selected cavities. ")
+        #print ("debug Starts the phase scans for all or selected cavities. ")
         
     def performActionForSelected(self):
         self.cavs_scan_cntrl = self.upper_panel_cntrl.cavs_scan_cntrl
@@ -392,7 +392,7 @@ class StartScan_Action:
                 continue
             cavs_list.append(cav_wrapper)
         self._performAction(cavs_list)        
-        print ("debug start scans for selected cavities.")   
+        #print ("debug start scans for selected cavities.")   
         
     def performAction(self):
         self.cavs_scan_cntrl = self.upper_panel_cntrl.cavs_scan_cntrl
@@ -407,7 +407,7 @@ class StartScan_Action:
         #------------------------------------------
         cav_wrappers = self.cavs_scan_cntrl.cav_wrappers[row:]
         self._performAction(cav_wrappers)
-        print ("debug Starts the phase scans for all cavities. ")
+        #print ("debug Starts the phase scans for all cavities. ")
 
 class StopScan_Action:
     """ Stop the phase scans for all cavities. """ 
@@ -419,7 +419,7 @@ class StopScan_Action:
         self.cavs_scan_cntrl = self.upper_panel_cntrl.cavs_scan_cntrl
         self.scan_stopper = self.cavs_scan_cntrl.scan_stopper
         self.scan_stopper.setShouldStop(True)
-        print ("debug Stops the phase scans. ")
+        #print ("debug Stops the phase scans. ")
 
 #----------------------------------------------------------
 #  Sub-panels for knobs and tables
