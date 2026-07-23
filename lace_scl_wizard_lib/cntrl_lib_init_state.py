@@ -218,6 +218,13 @@ class CavsDataTableModel(LACE_DataTableModel):
             epics_phase_item = self.item(cav_ind,4) ; epics_phase_item.setText("%+7.2f"%cav_wrapper.epicsPhaseInit)
             self._updateBoolItem(cav_wrapper.isMeasured,self.item(cav_ind,5))
             self._updateBoolItem(cav_wrapper.isAnalyzed,self.item(cav_ind,6))
+            #------------------------------------------------
+            if(cav_ind == 0):
+                for item_ind in range(7,self.columnCount()):
+                    item = self.item(cav_ind,item_ind)
+                    item.setText("")
+                continue
+            #------------------------------------------------                
             model_amp_item  = self.item(cav_ind,7) ; model_amp_item.setText("%6.4f"%cav_wrapper.modelAmp)           
             model_phase_item = self.item(cav_ind,8) ; model_phase_item.setText("%+6.2f"%cav_wrapper.modelPhase) 
             model_coeff_amp_item = self.item(cav_ind,9) ; model_coeff_amp_item.setText("%6.4f"%cav_wrapper.modelCoeffToEpicsAmp)
@@ -353,7 +360,7 @@ class InitCavs_Action:
             cav_wrapper.cleanAllScanData() 
         for bpm_wrapper in bad_bpms:
             bpm_wrapper.isGood = False
-        #---- check real connection to EPICS
+        #---- check real connection to EPICS for BPMs
         bpm_amp_pvs = [bpm_wrapper.getAmpPV() for bpm_wrapper in bpm_wrappers]
         bpm_phase_pvs = [bpm_wrapper.getPhasePV() for bpm_wrapper in bpm_wrappers]
         amp_vals = [bpm_amp_pv.get() for bpm_amp_pv in bpm_amp_pvs]
@@ -364,6 +371,15 @@ class InitCavs_Action:
                 or (math.isnan(amp_vals[bpm_ind])) or \
                 (math.isnan(phase_vals[bpm_ind]))):
                 bpm_wrapper.isGood = False
+        #---- Get EPICS cavities' amplitude and phase
+        cav_amp_vals  = [cav_wrapper.getEPICS_CavityAmp() for cav_wrapper in cav_wrappers]
+        cav_phase_vals = [cav_wrapper.getEPICS_CavityPhase() for cav_wrapper in cav_wrappers]
+        for cav_ind,cav_wrapper in enumerate(cav_wrappers):
+            cav_wrapper.epicsAmpInit = cav_amp_vals[cav_ind]
+            cav_wrapper.epicsAmp = cav_wrapper.epicsAmpInit
+            cav_wrapper.epicsPhaseInit = cav_phase_vals[cav_ind]
+            cav_wrapper.epicsPhase = cav_wrapper.epicsPhaseInit
+        #---- Let's update tables 
         self.cavs_data_table_model.tableChanged()
         self.bpms_data_table_model.tableChanged()
         #print ("debug init all")        
@@ -434,6 +450,12 @@ class SetBPM12forAllCavs_Action:
     def performAction(self):
         cav_wrappers = self.cavs_state_cntrl.getCavWrappers()
         bpm_wrappers = self.cavs_state_cntrl.getBPM_Wrappers()
+        #---- The last BPM's position should less then HEBT:BPM11 postion
+        last_bpm_wrapper = None
+        for bpm_wrapper in bpm_wrappers:
+            if(bpm_wrapper.getAlias() == "HEBT:BPM11"):
+                last_bpm_wrapper = bpm_wrapper
+                break
         min_dist_bpm12 = self.min_dist_bpm12_spin_box.value()
         #---- Let's set BPM1 and BPM2
         for cav_wrapper in cav_wrappers:
@@ -455,6 +477,8 @@ class SetBPM12forAllCavs_Action:
                 if(not bpm_wrapper.isGood): continue
                 if(bpm_wrapper.getPosition() > cav_wrapper.bpm_wrapper0.getPosition() + min_dist_bpm12):
                     cav_wrapper.bpm_wrapper1 = bpm_wrapper
+                    if(bpm_wrapper.getPosition() >= last_bpm_wrapper.getPosition()):
+                        cav_wrapper.bpm_wrapper1 = last_bpm_wrapper
                     break
             if(cav_wrapper.bpm_wrapper0 == None):
                 print ("debug ERROR cav=",cav_wrapper.alias," cannot get BPM2!")
@@ -616,7 +640,7 @@ class InitState_Cntrl:
         self.min_dist_bpm12_spin_box.setRange(0.,100.)  # Set min/max range
         self.min_dist_bpm12_spin_box.setDecimals(0)     # Set precision to 2 decimal places
         self.min_dist_bpm12_spin_box.setSingleStep(1.0) # Set step size for arrow buttons
-        self.min_dist_bpm12_spin_box.setValue(25)       # Set default value        
+        self.min_dist_bpm12_spin_box.setValue(45)       # Set default value        
         set_bpm12_button = QPushButton(text="Set BPM1+BPM2 for All Cavs.",parent=None)
         set_bpm1_button = QPushButton(text="Set BPM1 for Slected Cavs.",parent=None)
         set_bpm2_button = QPushButton(text="Set BPM2 for Slected Cavs.",parent=None)

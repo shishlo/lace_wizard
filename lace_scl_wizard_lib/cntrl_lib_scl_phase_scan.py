@@ -260,9 +260,9 @@ class Cavs_Scan_Cntrl:
         bpm_phase_diff_plot.getAxis('left').setTextPen('white')
         bpm_phase_diff_plot.getAxis('bottom').setTextPen('white')
         #---- Now these data will be shown on the plot
-        #bpm_phase_diff_line = bpm_phase_diff_plot.plot(pen='white', linestyle="-", symbol="o", symbolBrush='r',marker_size=5, name=html.unescape("&Delta; &phi;<sub>12</sub>"))
-        bpm_phase_diff_line = bpm_phase_diff_plot.plot(pen=None, symbol="o", symbolSize=5, symbolBrush='r', name=html.unescape("&Delta; &phi;<sub>12</sub>"))
-        bpm_phase_diff_fit_line = bpm_phase_diff_plot.plot(pen="white",  linestyle="-", name=html.unescape("Fit &Delta; &phi;<sub>12</sub>"))        
+        bpm_phase_diff_line = bpm_phase_diff_plot.plot(pen='white', linestyle="-", symbol="o", symbolBrush='r',symbolSize=5, name=html.unescape("&Delta; &phi;<sub>12</sub>"))
+        #bpm_phase_diff_line = bpm_phase_diff_plot.plot(pen=None, symbol="o", symbolSize=5, symbolBrush='r', name=html.unescape("&Delta; &phi;<sub>12</sub>"))
+        bpm_phase_diff_fit_line = bpm_phase_diff_plot.plot(pen="red",  linestyle="-", name=html.unescape("Fit &Delta; &phi;<sub>12</sub>"))        
         return (bpm_phase_diff_line,bpm_phase_diff_fit_line)
     
     def setupBPM_PhaseAmpPlots(self):
@@ -503,8 +503,6 @@ class UpperScanPanelCntrl:
         self.wrap_phase_checkbox.setChecked(True)
         self.keep_phases_checkbox = QCheckBox("Keep Cavs Phases")
         self.keep_phases_checkbox.setChecked(False)
-        self.eKin_measure_checkbox = QCheckBox("Measure eKin")
-        self.eKin_measure_checkbox.setChecked(False)  
 
         hor_layout_1.addWidget(setSynchPhase_button)
         hor_layout_1.addWidget(self.sync_phase_double_spin_box)
@@ -516,8 +514,7 @@ class UpperScanPanelCntrl:
         hor_layout_1.addWidget(self.stat_for_in_enrg_spin_box)
         hor_layout_1.addWidget(QLabel("   "))
         hor_layout_1.addWidget(self.wrap_phase_checkbox)
-        hor_layout_1.addWidget(self.keep_phases_checkbox)
-        hor_layout_1.addWidget(self.eKin_measure_checkbox)   
+        hor_layout_1.addWidget(self.keep_phases_checkbox)  
 
         #----------------------------------------------
         #---- lower line - hor_view_2 panel
@@ -685,7 +682,7 @@ class CavsScanDataTableModel(LACE_DataTableModel):
         #self.cavs_state_cntrl = self.cavs_phase_scan_cntrl.cavs_state_cntrl
         self.cav_wrappers = self.lace_scl_wizard.getCavWrappers()
         #---- Sets the headers
-        headers = ["Cavity","Good","Done","BPM 1","BPM 2","Old Phase","New Phase","SinAmp","SinAmpErr","AccPhase"]
+        headers = ["Cavity","Good","Done","BPM 1","BPM 2","Old Phase","New Phase","SinAmp","SinFitErr","AccPhase"]
         self.setHorizontalHeaderLabels(headers)
         for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):
             name_item = QStandardItem(cav_wrapper.getAlias())
@@ -727,6 +724,13 @@ class CavsScanDataTableModel(LACE_DataTableModel):
                     self.item(cav_ind,ind).setText("")
                 continue
             self._updateBoolItem(cav_wrapper.isMeasured,self.item(cav_ind,2))
+            #--------------------------------
+            if(cav_ind == 0):
+                for item_ind in range(3,self.columnCount()):
+                    item = self.item(cav_ind,item_ind)
+                    item.setText("")
+                continue
+            #--------------------------------
             bpm1_item = self.item(cav_ind,3)
             if(cav_wrapper.bpm_wrapper0 != None):
                 bpm1_item.setText("%10s"%cav_wrapper.bpm_wrapper0.getAlias())

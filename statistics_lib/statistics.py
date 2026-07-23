@@ -171,3 +171,14 @@ def fitCosineFunc(bpm_phase_func,bpm_phase_fit_func = None):
     #---- Let's put fitting results into bpm_phase_fit_func
     (amp,phase_offset,avg_val) = scorer.setCosFunction(trialPoint,bpm_phase_fit_func)
     return (amp,phase_offset,avg_val)
+
+
+if __name__ == '__main__':
+    
+    #==================================================
+    #    START of Test SCRIPT
+    #==================================================
+    
+    
+    print ("Stop.")
+    sys.exit(0)
