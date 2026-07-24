@@ -499,9 +499,7 @@ class StartAnalysis_Action:
                 cav_wrapper.cleanAllScanData()
                 continue
             cavs_list.append(cav_wrapper)
-        self._performAction(cavs_list)
-        #---- ????????????????
-        #print ("debug start scans analysis for selected cavities.")   
+        self._performAction(cavs_list)  
         
     def performAction(self):
         self.scan_analysis_cntrl = self.upper_panel_cntrl.scan_analysis_cntrl
@@ -516,8 +514,6 @@ class StartAnalysis_Action:
         #------------------------------------------
         cav_wrappers = self.scan_analysis_cntrl.cav_wrappers[row:]
         self._performAction(cav_wrappers)
-        #---- ????????????????
-        #print ("debug Starts the phase scans for all cavities. ")
 
 class StopAnalysis_Action:
     """ Stop the analysis for all cavities. """ 
@@ -529,5 +525,3 @@ class StopAnalysis_Action:
         self.scan_analysis_cntrl = self.upper_panel_cntrl.scan_analysis_cntrl
         self.analysis_stopper = self.scan_analysis_cntrl.analysis_stopper
         self.analysis_stopper.setShouldStop(True)
-        #---- ????????????????
-        #print ("debug Stops the phase scans analysis. ")

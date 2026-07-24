@@ -87,7 +87,9 @@ class Analysis_Runner(QRunnable):
             
     @Slot()
     def run(self):
-        """ Analysis thread execution."""
+        """ Scan analysis thread execution."""
+        #---- Start analysis
+        self.analysis_stopper.setIsRunning(True)
         #-------------------------------------------------
         if(len(self.cav_wrappers) == 0):
             msg_txt = "Please select cavity/cavities for analysis!"
@@ -106,6 +108,8 @@ class Analysis_Runner(QRunnable):
         time_start = time.time()  
         #self.signals.analysis_data_changed.emit(("table_selection_clear",))
         for cav_local_ind,cav_wrapper in enumerate(self.cav_wrappers):
+            #---- cav index in the global table
+            cav_ind = self.cavs_data_analysis_table_model.cav_wrappers.index(cav_wrapper)
             #---- May be we want to stop
             if(self.analysis_stopper.getShouldStop()):
                 self.analysis_stopper.setShouldStop(False)
@@ -117,12 +121,7 @@ class Analysis_Runner(QRunnable):
                 self.signals.analysis_data_changed.emit(("table_selection_set",cav_ind))
                 self.signals.analysis_data_changed.emit(("table_changed",))
                 return
-             #---- cav index in the table
-            cav_ind = self.cavs_data_analysis_table_model.cav_wrappers.index(cav_wrapper)
             self.signals.analysis_data_changed.emit(("table_selection_set",cav_ind))
-            #---- we will skip cavity without measured data
-            if(not cav_wrapper.isMeasured):
-                continue
             #----------------------------------------------
             cav_start = cav_wrapper.getAlias()
             cav_stop = self.cav_wrappers[-1].getAlias()
@@ -130,17 +129,32 @@ class Analysis_Runner(QRunnable):
             self.signals.analysis_data_changed.emit(("status_update",msg_txt))
             if(cav_wrapper.isGood == False):
                 cav_wrapper_previous = self.cavs_data_analysis_table_model.cav_wrappers[cav_ind-1]
-                cav_wrapper.E0TL = 0.
+                cav_wrapper.E0TL = 15.0
                 cav_wrapper.eKin_in = cav_wrapper_previous.eKin_out
                 cav_wrapper.eKin_out = cav_wrapper_previous.eKin_out
                 cav_wrapper.eKin_model_in = cav_wrapper_previous.eKin_model_out
-                cav_wrapper.eKin_model_out = cav_wrapper_previous.eKin_model_out                
+                cav_wrapper.eKin_model_out = cav_wrapper_previous.eKin_model_out
                 if((cav_ind + 1) != len(self.cavs_data_analysis_table_model.cav_wrappers)):
                     cav_wrapper_next = self.cavs_data_analysis_table_model.cav_wrappers[cav_ind+1]
                     cav_wrapper_next.eKin_in = cav_wrapper.eKin_out
                     cav_wrapper_next.eKin_model_in = cav_wrapper.eKin_model_out
                 cav_wrapper.isAnalyzed = False
                 continue
+            #----------------------------------------------
+            #---- we will skip cavity without measured data
+            if(not cav_wrapper.isMeasured):
+                time_scan = time.time() - time_start          
+                self.analysis_stopper.setShouldStop(False)
+                self.analysis_stopper.setIsRunning(False)
+                self.cleanAllDownstreamCavities(cav_wrapper)
+                msg_txt  = "Analysis stopped. No scan data for cavity="
+                msg_txt += cav_wrapper.getAlias()
+                msg_txt += " Cannot continue."
+                msg_txt += " Execution time[sec] = "+"%7.1f"%time_scan                     
+                self.signals.analysis_data_changed.emit(("status_update",msg_txt))
+                self.signals.analysis_data_changed.emit(("table_selection_set",cav_ind))
+                self.signals.analysis_data_changed.emit(("table_changed",)) 
+                return
             #------------------------------------------------------------------
             #---- Here we start analysis of full array of BPMs data to get
             #---- functions eKinOut vs. cavity phase. We will consider set of 
@@ -154,26 +168,6 @@ class Analysis_Runner(QRunnable):
             #---- calculation of cav_wrapper.eKin_out_func from BPMs' data
             eKin_out_local_func = self.phaseScanAnalysis(eKin_in_guess,cav_wrapper)
             (x_arr,y_arr,err_arr) = eKin_out_local_func.getXYErrLists()
-            #???????????????????????????????????????????????
-            """
-            print ("debug --------------------------------------------")
-            print ("debug cav=",cav_wrapper.getAlias())
-            if(len(x_arr) != cav_wrapper.eKin_out_func.getSize()):
-                print ("debug xal cav. phase points=",cav_wrapper.eKin_out_func.getSize())
-                print ("debug pyorbit3 phase points=",len(x_arr))
-            else:
-                print ("debug cav_phase xal_eKin err  eKin err   delta")
-                for ind in range(len(x_arr)):
-                    st  = "%+8.2f "%x_arr[ind]
-                    st += " %9.3f "%cav_wrapper.eKin_out_func.y(ind)
-                    st += " %5.3f "%cav_wrapper.eKin_out_func.err(ind)
-                    st += "  %9.3f "%y_arr[ind]
-                    st += " %5.3f "%err_arr[ind]
-                    st += "    %5.3f "%(y_arr[ind]-cav_wrapper.eKin_out_func.y(ind))
-                    print (st)
-            print ("debug --------------------------------------------")
-            """
-            #???????????????????????????????????????????????
             cav_wrapper.eKin_out_func.initFromLists(x_arr,y_arr,err_arr)
             #------------------------------------------------------------------
             #---- Performing analysis - from here we assume that cav_wrapper
@@ -184,13 +178,6 @@ class Analysis_Runner(QRunnable):
             (E0TL,cav_phase_offset,eKin_in_guess) = fitCosineFunc(cav_wrapper.eKin_out_func,cav_wrapper.eKin_out_fit_func)
             cav_wrapper.synch_real_acc_phase = phaseNearTargetPhaseDeg(cav_wrapper.epicsPhase - (180.-cav_phase_offset),0.)
             #print ("debug  cav=",cav_wrapper.getAlias()," eKin_in = ",eKin_in_guess," E0TL =",E0TL," cav_phase_offset=",cav_phase_offset)
-            #----?????????????????????????????
-            """
-            (amp,phase_offset,y_avg) = fitCosineFunc(cav_wrapper.phaseDiffBPM01_func)
-            print ("debug  cav=",cav_wrapper.getAlias()," y_avg = ",y_avg," Amp =",amp," phase_offset=",phase_offset)
-            print ("debug ----------------------------------------------------")
-            """
-            #----?????????????????????????????
             #---- These are preliminary setting based on 1-st order harmonic of phase scan
             cav_wrapper.E0TL = E0TL
             cav_wrapper.eKin_in = eKin_in_guess
@@ -203,6 +190,8 @@ class Analysis_Runner(QRunnable):
                 cav_wrapper.eKin_model_out = cav_wrapper.eKin_in
                 cav_wrapper.setModelCavityPhaseOffset(0.)
                 cav_wrapper.isAnalyzed = True
+                #---- Update information in the table for the cavity
+                self.signals.analysis_data_changed.emit(("table_cavity_data_cahnged",cav_wrapper))
                 continue
             #---- Fitting model parameters directly
             #print ("debug cav=",cav_wrapper.getAlias()," phase_offset=",cav_phase_offset)
@@ -250,7 +239,7 @@ class Analysis_Runner(QRunnable):
                 cav_wrapper_next.eKin_model_in = cav_wrapper.eKin_model_out
             #---- Update information in the table for the cavity
             self.signals.analysis_data_changed.emit(("table_cavity_data_cahnged",cav_wrapper))
-            #----  
+            #---- Stop scan analysis if requested
             if(self.analysis_stopper.getShouldStop()):
                 self.analysis_stopper.setShouldStop(False)
                 self.analysis_stopper.setIsRunning(False)
@@ -375,23 +364,6 @@ class Analysis_Runner(QRunnable):
                 bpm_phases.append(bpm_phase)
             res_arr = self.energy_meter.fitEnergyFromBPMsPhases(eKin_guess,bpm_positions,bpm_phases,bpm_offsets)
             (eKin,eKin_err,phase_pos_func,phase_pos_fit_func) = res_arr
-            #----- ????????????????????????????????????????
-            """
-            if(cav_wrapper.getAlias() == "Cav32a" and abs(cav_phase - 180.) < 0.1):
-                print ("debug ============ cav=",cav_wrapper.getAlias()," cav. phase=",cav_phase)
-                print ("debug n BPMs' pos. =",phase_pos_func.getSize())
-                print ("debug n   BPMs     =",len(bpm_wrappers))
-                for bpm_ind in range(phase_pos_func.getSize()):
-                    st  = " bpm = " + bpm_wrappers[bpm_ind].getAlias()
-                    st += " pos = %8.3f"%phase_pos_func.x(bpm_ind)
-                    st += " phase = %+8.2f"%phase_pos_func.y(bpm_ind)
-                    st += " fit = %+8.2f"%phase_pos_fit_func.y(bpm_ind)
-                    st += "    diff = %+8.2f"%(phase_pos_func.y(bpm_ind) - phase_pos_fit_func.y(bpm_ind))
-                    print ("debug ",st)
-            
-                print ("debug =====================================")
-            """
-            #----- ????????????????????????????????????????
             eKin_out_local_func.add(cav_phase,eKin,eKin_err)
         return eKin_out_local_func
 

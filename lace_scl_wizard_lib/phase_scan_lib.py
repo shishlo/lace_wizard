@@ -201,6 +201,8 @@ class PhaseScan_Runner(QRunnable):
     @Slot()
     def run(self):
         """ Phase scan thread execution."""
+        self.scan_stopper.setIsRunning(True)
+        #-------------------------------------------
         cav_start = self.cav_wrappers[0].getAlias()
         cav_stop = self.cav_wrappers[-1].getAlias()
         msg_txt = "Phase scan started with cvity = " + cav_start + " to " + cav_stop
@@ -275,6 +277,7 @@ class PhaseScan_Runner(QRunnable):
             self.signals.scan_data_changed.emit(("update_bpm_phases_plot",cav_wrapper))         
             cav_wrapper.isMeasured = True
             self.signals.scan_data_changed.emit(("table_changed",))
+            time.sleep(sleep_time)
         #--------- END of SCAN
         time_scan = time.time() - time_start
         msg_txt = "Phase scan finished. Time[sec] = "+"%7.1f"%time_scan
