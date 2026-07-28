@@ -30,6 +30,8 @@ from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Slot, Signal
 
 from statistics_lib.statistics import fitCosineFunc, calculateAvgErr
 
+from statistics_lib.statistics import fitCosineFuncTwoHarms
+
 #------------------------------------------------------------------------
 #           Auxiliary SCAN classes and functions
 #------------------------------------------------------------------------   
@@ -161,23 +163,40 @@ class Analysis_Runner(QRunnable):
             #---- BPMs for each cavity phase and use the energy meter to get
             #---- eKinOut for this phase.
             #---- As the result we will get cav_wrapper.eKin_out_func function.
-            #------------------------------------------------------------------
+            #------------------------------------------------------------------ 
             eKin_in_guess = cav_wrapper.eKin_in
             if(cav_start.find("CCL") >= 0):
                 eKin_in_guess = 185.6
             #---- calculation of cav_wrapper.eKin_out_func from BPMs' data
-            eKin_out_local_func = self.phaseScanAnalysis(eKin_in_guess,cav_wrapper)
-            (x_arr,y_arr,err_arr) = eKin_out_local_func.getXYErrLists()
-            cav_wrapper.eKin_out_func.initFromLists(x_arr,y_arr,err_arr)
+            self.phaseScanAnalysis(eKin_in_guess,cav_wrapper,cav_wrapper.eKin_out_func)
             #------------------------------------------------------------------
             #---- Performing analysis - from here we assume that cav_wrapper
             #---- has eKin_out_func with data eKinOut vs cavity phase
             #---- We will use this function to get parameters of cavity model
             #---- and eKinOut for the next cavity as eKinIn.
             #------------------------------------------------------------------
+
             (E0TL,cav_phase_offset,eKin_in_guess) = fitCosineFunc(cav_wrapper.eKin_out_func,cav_wrapper.eKin_out_fit_func)
+            
+            #---- Another possible solution by using 2 haromics 1st and 2nd - nor working well yet
+            #(amp1,avg_value,phase_min_pos,phase_max_pos,phase_fit_func) = fitCosineFuncTwoHarms(cav_wrapper.eKin_out_func,cav_wrapper.eKin_out_fit_func)
+            #E0TL = amp1
+            #cav_phase_offset = phaseNearTargetPhaseDeg(-(phase_max_pos-180.),0.)
+            #eKin_in_guess = avg_value
+            
             cav_wrapper.synch_real_acc_phase = phaseNearTargetPhaseDeg(cav_wrapper.epicsPhase - (180.-cav_phase_offset),0.)
-            #print ("debug  cav=",cav_wrapper.getAlias()," eKin_in = ",eKin_in_guess," E0TL =",E0TL," cav_phase_offset=",cav_phase_offset)
+            
+            #---- ========== debug printing ============= START
+            """
+            st  = "debug  cav=" + cav_wrapper.getAlias()
+            st += "  eKin_in=%8.3f"%eKin_in_guess
+            st += " E0TL=%8.3f"%E0TL
+            st += " cav_phase_offset=%+9.3f"%cav_phase_offset
+            st += " synch_real_acc_phase=%+9.3f"%cav_wrapper.synch_real_acc_phase
+            print (st)
+            """
+            #---- ========== debug printing ============= STOP
+            
             #---- These are preliminary setting based on 1-st order harmonic of phase scan
             cav_wrapper.E0TL = E0TL
             cav_wrapper.eKin_in = eKin_in_guess
@@ -194,7 +213,6 @@ class Analysis_Runner(QRunnable):
                 self.signals.analysis_data_changed.emit(("table_cavity_data_cahnged",cav_wrapper))
                 continue
             #---- Fitting model parameters directly
-            #print ("debug cav=",cav_wrapper.getAlias()," phase_offset=",cav_phase_offset)
             #---- Now we create the phase scan for the model to compare it to 
             #---- the real Cosine Fit for cav_wrapper.eKin_out_func
             cav_wrapper.setModelCavityPhaseOffset(0.)
@@ -206,7 +224,6 @@ class Analysis_Runner(QRunnable):
             #---- This will rewrite the cav_wrapper.eKin_out_fit_func
             eKin_out_appr_model_func = scorer.update_eKinOutFitFunction()
             (E0TL_model,cav_phase_offset_model,eKin_in_guess_model) = fitCosineFunc(eKin_out_appr_model_func)
-            #print ("debug cav=",cav_wrapper.getAlias()," phase_offset_model=",cav_phase_offset_model)
             #---- Fix the model amplitude - it will be closer to BPM data
             coeff_amp = cav_wrapper.E0TL/E0TL_model
             model_cav_amp = cav_wrapper.model_cav.getModelAmp()
@@ -224,8 +241,6 @@ class Analysis_Runner(QRunnable):
             #---- Let's update cav_wrapper.eKin_out_fit_func
             scorer.calcModel_eKinOut_Arr(cav_wrapper.eKin_in)
             scorer.update_eKinOutFitFunction()
-            #print ("debug  cav=",cav_wrapper.getAlias()," model_cav_amp,model_cav_phase_offset=",[model_cav_amp,model_cav_phase_offset])
-            #print ("debug  cav=",cav_wrapper.getAlias(), "best score = ",math.sqrt(best_score))
             cav_wrapper.isAnalyzed = True
             cav_wrapper.modelAmp = cav_wrapper.model_cav.getModelAmp()
             cav_wrapper.model_cav.setEPICS_CavityModelPhase(cav_wrapper.epicsPhase)
@@ -259,7 +274,7 @@ class Analysis_Runner(QRunnable):
         self.signals.analysis_data_changed.emit(("table_selection_clear",))
         cav_ind = self.cavs_data_analysis_table_model.cav_wrappers.index(self.cav_wrappers[-1])
         self.signals.analysis_data_changed.emit(("table_selection_set",cav_ind))
-        self.signals.analysis_data_changed.emit(("table_changed",))
+        self.signals.analysis_data_changed.emit(("table_changed",))       
         self.cleanAllDownstreamCavities(self.cav_wrappers[-1])
         self.analysis_stopper.setShouldStop(False)
         self.analysis_stopper.setIsRunning(False)
@@ -275,8 +290,6 @@ class Analysis_Runner(QRunnable):
             return
         for cav_wrapper_next in self.cavs_data_analysis_table_model.cav_wrappers[cav_ind+1:]:
             cav_wrapper_next.isAnalyzed = False
-            cav_wrapper_next.eKin_in = 185.6
-            cav_wrapper_next.eKin_out = 185.6
             cav_wrapper_next.eKin_out_func.clean()
             cav_wrapper_next.eKin_out_fit_func.clean()
             cav_wrapper_next.eKin_out_fit_delta_rms = 0.
@@ -328,11 +341,12 @@ class Analysis_Runner(QRunnable):
         best_score = scorer.getScore(trialPoint)
         return (best_score,trialPoint)
         
-    def phaseScanAnalysis(self,eKin_guess,cav_wrapper):
+    def phaseScanAnalysis(self,eKin_guess,cav_wrapper,eKin_out_local_func = None):
         """ 
-        Performs CCL4 phase scan analysis. Really, there is no scan, only
-        BPMs' phases and amplitudes measured several times. We just want to 
-        extract eKin_in and eKin_out values which are the same.
+        Performs phase scan analysis of BPMs phase for each phase of the cavity.
+        It analyzes BPMs' phases and amplitudes created by freely moving beam.
+        All downstream cavities are blanked. For each phase of active cavity 
+        calculate the energy as this phase.
         """
         min_bpm_amp = self.bpm_min_amp_spin_box.value()
         #---- bpm_amp_phase_dic[BPM_Wrapper.getAlias()] = (FunctionAmp,FunctionPhase)
@@ -348,7 +362,10 @@ class Analysis_Runner(QRunnable):
                 bpm_wrappers.append(bpm_wrapper)
                 bpm_wrappers_useInPhaseAnalysis[bpm_wrapper_ind] = True
         #-----------------------------------------------
-        eKin_out_local_func = Function()
+        if(eKin_out_local_func == None):
+            eKin_out_local_func = Function()
+        else:
+            eKin_out_local_func.clean()
         n_cav_phase_points = bpm_amp_phase_dict[bpm_wrappers[0].getAlias()][1].getSize()
         bpm_positions = []
         bpm_offsets = []
@@ -362,6 +379,7 @@ class Analysis_Runner(QRunnable):
             for bpm_wrapper in bpm_wrappers:
                 bpm_phase = bpm_amp_phase_dict[bpm_wrapper.getAlias()][1].y(cav_phase_ind)
                 bpm_phases.append(bpm_phase)
+            #---- energy meter calculates the energy and error
             res_arr = self.energy_meter.fitEnergyFromBPMsPhases(eKin_guess,bpm_positions,bpm_phases,bpm_offsets)
             (eKin,eKin_err,phase_pos_func,phase_pos_fit_func) = res_arr
             eKin_out_local_func.add(cav_phase,eKin,eKin_err)
