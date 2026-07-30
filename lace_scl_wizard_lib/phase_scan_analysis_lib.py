@@ -104,7 +104,6 @@ class Analysis_Runner(QRunnable):
         cav_stop = self.cav_wrappers[-1].getAlias()
         msg_txt = "Analysis started with cvity = " + cav_start + " to " + cav_stop
         self.signals.analysis_data_changed.emit(("status_update",msg_txt))
-        ######self.cavs_table_view.clearSelection()
         min_bpm_amp = self.bpm_min_amp_spin_box.value()
         iter_count = 0
         time_start = time.time()  
@@ -175,19 +174,10 @@ class Analysis_Runner(QRunnable):
             #---- We will use this function to get parameters of cavity model
             #---- and eKinOut for the next cavity as eKinIn.
             #------------------------------------------------------------------
-
-            #(E0TL,cav_phase_offset,eKin_in_guess) = fitCosineFunc(cav_wrapper.eKin_out_func,cav_wrapper.eKin_out_fit_func)
-            
-            (amp1,avg_value,phase_min_pos,phase_max_pos,phase_fit_func_tmp) = fitHarmonicData(cav_wrapper.eKin_out_func)
-            #print ("debug (amp1,avg_value,phase_min_pos,phase_max_pos)=",(amp1,avg_value,phase_min_pos,phase_max_pos))
-            
-            #---- Another possible solution by using 2 haromics 1st and 2nd - nor working well yet
-            #(amp1,avg_value,phase_min_pos,phase_max_pos,phase_fit_func) = fitCosineFuncTwoHarms(cav_wrapper.eKin_out_func,cav_wrapper.eKin_out_fit_func)
+            (amp1,avg_value,phase_min_pos,phase_max_pos,phase_fit_func_tmp) = fitHarmonicData(cav_wrapper.eKin_out_func,cav_wrapper.eKin_out_fit_func)
             E0TL = amp1
-            cav_phase_offset = phaseNearTargetPhaseDeg(-(phase_max_pos-180.),0.)
+            cav_phase_offset = phaseNearTargetPhaseDeg(180.-phase_max_pos,0.)
             eKin_in_guess = avg_value
-            
-            #cav_wrapper.synch_real_acc_phase = phaseNearTargetPhaseDeg(cav_wrapper.epicsPhase - (180.-cav_phase_offset),0.)
             cav_wrapper.synch_real_acc_phase = phaseNearTargetPhaseDeg(cav_wrapper.epicsPhase - phase_max_pos,0.)
             
             #---- ========== debug printing ============= START
