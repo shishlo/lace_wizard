@@ -30,7 +30,7 @@ from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Slot, Signal
 
 from statistics_lib.statistics import fitCosineFunc, calculateAvgErr
 
-from statistics_lib.statistics import fitCosineFuncTwoHarms
+from statistics_lib.statistics import fitHarmonicData
 
 #------------------------------------------------------------------------
 #           Auxiliary SCAN classes and functions
@@ -176,15 +176,19 @@ class Analysis_Runner(QRunnable):
             #---- and eKinOut for the next cavity as eKinIn.
             #------------------------------------------------------------------
 
-            (E0TL,cav_phase_offset,eKin_in_guess) = fitCosineFunc(cav_wrapper.eKin_out_func,cav_wrapper.eKin_out_fit_func)
+            #(E0TL,cav_phase_offset,eKin_in_guess) = fitCosineFunc(cav_wrapper.eKin_out_func,cav_wrapper.eKin_out_fit_func)
+            
+            (amp1,avg_value,phase_min_pos,phase_max_pos,phase_fit_func_tmp) = fitHarmonicData(cav_wrapper.eKin_out_func)
+            #print ("debug (amp1,avg_value,phase_min_pos,phase_max_pos)=",(amp1,avg_value,phase_min_pos,phase_max_pos))
             
             #---- Another possible solution by using 2 haromics 1st and 2nd - nor working well yet
             #(amp1,avg_value,phase_min_pos,phase_max_pos,phase_fit_func) = fitCosineFuncTwoHarms(cav_wrapper.eKin_out_func,cav_wrapper.eKin_out_fit_func)
-            #E0TL = amp1
-            #cav_phase_offset = phaseNearTargetPhaseDeg(-(phase_max_pos-180.),0.)
-            #eKin_in_guess = avg_value
+            E0TL = amp1
+            cav_phase_offset = phaseNearTargetPhaseDeg(-(phase_max_pos-180.),0.)
+            eKin_in_guess = avg_value
             
-            cav_wrapper.synch_real_acc_phase = phaseNearTargetPhaseDeg(cav_wrapper.epicsPhase - (180.-cav_phase_offset),0.)
+            #cav_wrapper.synch_real_acc_phase = phaseNearTargetPhaseDeg(cav_wrapper.epicsPhase - (180.-cav_phase_offset),0.)
+            cav_wrapper.synch_real_acc_phase = phaseNearTargetPhaseDeg(cav_wrapper.epicsPhase - phase_max_pos,0.)
             
             #---- ========== debug printing ============= START
             """
@@ -247,7 +251,10 @@ class Analysis_Runner(QRunnable):
             cav_wrapper.modelPhase =  phaseNearTargetPhaseDeg(cav_wrapper.model_cav.getModelPhase(),0.)     
             cav_wrapper.modelCoeffToEpicsAmp =  cav_wrapper.model_cav.getModelCoeffToEpicsAmp()
             #---- Tracking the synchronous particle through the model cavity
+            cav_wrapper_previous = self.cavs_data_analysis_table_model.cav_wrappers[cav_ind-1]
+            cav_wrapper.eKin_model_in = cav_wrapper_previous.eKin_model_out
             cav_wrapper.eKin_model_out = self.trackBunchThroughModel(cav_wrapper.eKin_model_in,cav_wrapper.epicsPhase,cav_wrapper)
+            #---------------------------------------------------------------
             if( (cav_ind + 1) != len(self.cavs_data_analysis_table_model.cav_wrappers)):
                 cav_wrapper_next = self.cavs_data_analysis_table_model.cav_wrappers[cav_ind+1]
                 cav_wrapper_next.eKin_in = cav_wrapper.eKin_out

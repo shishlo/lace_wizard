@@ -9,6 +9,7 @@ import random
 import time
 
 from orbit.core.orbit_utils import Function
+from orbit.core.orbit_utils import SplineCH
 from orbit.core.orbit_utils import HarmonicData
 
 from orbit.utils import phaseNearTargetPhase, phaseNearTargetPhaseDeg
@@ -139,7 +140,7 @@ def fitCosineFunc(bpm_phase_func,bpm_phase_fit_func = None,harm_num = 1):
     #---- Search algorithm from PyORBIT native package
     searchAlgorithm = SimplexSearchAlgorithm()
 
-    max_time = 0.05
+    max_time = 0.03
     solverStopper = SolveStopperFactory.maxTimeStopper(max_time)
 
     solver = Solver()
@@ -175,10 +176,17 @@ def fitCosineFunc(bpm_phase_func,bpm_phase_fit_func = None,harm_num = 1):
     (amp,phase_offset,avg_val) = scorer.setCosFunction(trialPoint,bpm_phase_fit_func)
     return (amp,phase_offset,avg_val)
 
-def fitCosineFuncTwoHarms(phase_func,phase_fit_func = None):
+def fitHarmonicData(phase_func,phase_fit_func = None):
     """
     Fits input data with f(x) = a0 + a1*cos((x-180) + x_offset1) + a2*cos(2(x-180) + x_offset2)
     """
+    #--------------------------------------
+    if(phase_fit_func == None):
+        phase_fit_func = Function()
+    else:
+        phase_fit_func.clean()
+    #--------------------------------------
+    
     phase_1st_fit_func = Function()
     (amp1,phase_offset1,avg_val1) = fitCosineFunc(phase_func,phase_1st_fit_func,harm_num = 1)
     phase2_func = Function()
@@ -186,43 +194,188 @@ def fitCosineFuncTwoHarms(phase_func,phase_fit_func = None):
         phase2_func.add(phase_func.x(ind),phase_func.y(ind) - phase_1st_fit_func.y(ind))
     phase_2st_fit_func = Function()
     (amp2,phase_offset2,avg_val2) = fitCosineFunc(phase2_func,phase_2st_fit_func,harm_num = 2)
-    if(phase_fit_func == None):
-        phase_fit_func = Function()
-    phase_fit_func.clean()
+    phase3_func = Function()
     for ind in range(phase_func.getSize()):
-        phase_fit_func.add(phase_func.x(ind),phase_1st_fit_func.y(ind) + phase_2st_fit_func.y(ind))
-    """
-    diff2 = 0.
-    for ind in range(phase_func.getSize()):
-        diff2 += ( phase_func.y(ind) - phase_fit_func.y(ind))**2
-    diff2 /=  phase_func.getSize()
-    diff = math.sqrt(diff2)
-    print ("debug diff=",diff)
-    """
+        phase3_func.add(phase_func.x(ind),phase2_func.y(ind) - phase_2st_fit_func.y(ind))
+        
     harmonic_data = HarmonicData(2,phase_func)
     avg_value = avg_val1+avg_val2
-    harmonic_data.parameter(0,avg_val1+avg_val2)
+    harmonic_data.parameter(0,avg_value)
     harmonic_data.parameter(1,amp1)
-    harmonic_data.parameter(2,phase_offset1 - 180.)
+    harmonic_data.parameter(2,phase_offset1-180.)
     harmonic_data.parameter(3,amp2)
-    harmonic_data.parameter(4,phase_offset2)
+    harmonic_data.parameter(4,phase_offset2)        
+    """
+    #---- debug printing     
+    print ("======= fitting quality two harmonics ================")
+    print (" phase y0  y1_fit y_delta y_delta_fit err err2")
+    for ind in range(phase_func.getSize()):
+        x = phase_func.x(ind)
+        y = phase_func.y(ind)
+        y1_fit = phase_1st_fit_func.y(ind)
+        y2 = phase2_func.y(ind)
+        y2_fit = phase_2st_fit_func.y(ind)
+        err = phase3_func.y(ind)
+        y_sum_fit = phase_1st_fit_func.y(ind) + phase_2st_fit_func.y(ind)
+        harm_val = harmonic_data.fitValueY(x)
+        err2 = y - harm_val
+        st = "%+8.2f"%x + " %+10.3f "%y + " %+10.3f "%y1_fit + " %+10.5f "%y2 + " %+10.5f "%y2_fit + " %+10.5f "%err +  " %+10.5f "%err2
+        print (st)
+    print ("=======================================================")
+    """
+    
+    #---- Initial point initilization 
+    variableProxy_arr = []
+    name_arr = ["amp0","amp1","pha1","amp2","pha2"]
+    for ind, name in enumerate(name_arr):
+        val = harmonic_data.parameter(ind)
+        val_step = abs(0.01*val)
+        if(ind == 2 or ind == 4):
+            val_step = 0.5         
+        variableProxy_arr.append(VariableProxy(name,val,val_step))
+
+    trialPoint = TrialPoint()
+    for variableProxy in variableProxy_arr:
+        trialPoint.addVariableProxy(variableProxy)  
+    
+    #print ("debug =============================")
+    #print (trialPoint.textDesciption())
+    
+    #---- class to provide difference between data and fit function
+    class HarmonicScorer(Scorer):
+        """
+        The implementation of the abstract Score class 
+        as harmonic function score
+        """
+        def __init__(self,harmonic_data):
+            self.harmonic_data = harmonic_data
+        
+        def getScore(self,trialPoint):
+            x_arr = trialPoint.getVariableProxyValuesArr()
+            for x_ind in range(len(x_arr)):
+                self.harmonic_data.parameter(x_ind,x_arr[x_ind])
+            return harmonic_data.sumDiff2()
+                
+    #---- Search algorithm from PyORBIT native package
+    searchAlgorithm = SimplexSearchAlgorithm()
+    
+    #maxIter = 1000
+    #solverStopper = SolveStopperFactory.maxIterationStopper(maxIter)
+    
+    max_time = 0.03
+    solverStopper = SolveStopperFactory.maxTimeStopper(max_time)
+    
+    solver = Solver()
+    solver.setAlgorithm(searchAlgorithm)
+    solver.setStopper(solverStopper)
+    
+    scorer =  HarmonicScorer(harmonic_data)
+    
+    solver.solve(scorer,trialPoint)	
+    
+    #---- the fitting process ended, now about results
+    #print ("==============================================================")
+    #print ("??????????????????????????????????????????????????????????????")
+    #solver.getScoreboard().printScoreBoard()
+    #print ("===== fitting time =",solver.getScoreboard().getRunTime())
+    #bestScore = solver.getScoreboard().getBestScore()	
+    #print ("best score=",bestScore)
+
+    #----- this will set the trial point for best score to the harmonic_data
+    trialPoint = solver.getScoreboard().getBestTrialPoint()
+    best_score = scorer.getScore(trialPoint)
+    #print (trialPoint.textDesciption())
+    #print ("best score=",bestScore," iteration=",solver.getScoreboard().getIteration())
+    
+    """
+    #---- debug printing     
+    print ("======= fitting quality ================")
+    print (" cav_phase y y-fit  err ")
+    for ind in range(phase_func.getSize()):
+        x = phase_func.x(ind)
+        y = phase_func.y(ind)
+        y_fit = harmonic_data.fitValueY(x)
+        y_err = y - y_fit
+        st = "%+8.2f"%x + " %+10.3f "%y + " %+10.3f "%y_fit + " %+10.5f "%y_err
+        print (st)
+    """
+    
     dummy_func = Function()
+    coeff_grad_to_radians = math.pi/180.
     harmonic_deriv_data = HarmonicData(2,dummy_func)
     harmonic_deriv_data.parameter(0,0.)
-    harmonic_deriv_data.parameter(1,-amp1)
-    harmonic_deriv_data.parameter(2,phaseNearTargetPhaseDeg(phase_offset1 - 180. - 90.,0.))
-    harmonic_deriv_data.parameter(3,-2*amp2)
-    harmonic_deriv_data.parameter(4,phaseNearTargetPhaseDeg(phase_offset2 - 90.,0.))
-    phase_min_pos = findCosLikeMinPhasePos(harmonic_data,harmonic_deriv_data,-phase_offset1)
-    phase_max_pos = findCosLikeMaxPhasePos(harmonic_data,harmonic_deriv_data,180.-phase_offset1)
+    harmonic_deriv_data.parameter(1,-coeff_grad_to_radians*harmonic_data.parameter(1))
+    harmonic_deriv_data.parameter(2,phaseNearTargetPhaseDeg(harmonic_data.parameter(2) - 90.,0.))
+    harmonic_deriv_data.parameter(3,-2*coeff_grad_to_radians*harmonic_data.parameter(3))
+    harmonic_deriv_data.parameter(4,phaseNearTargetPhaseDeg(harmonic_data.parameter(4) - 90.,0.))
+    
+    """
+    #---- debug printing 
+    print ("======= derivative ================")
+    print (" cav_phase derY ")
+    for ind in range(phase_func.getSize()):
+        x = phase_func.x(ind)
+        y_der = harmonic_deriv_data.fitValueY(x)
+        st = "%+8.2f"%x + " %+10.3f "%y_der
+        print (st)
+    """
+    
+    avg_value = harmonic_data.parameter(0)
+    amp1 = harmonic_data.parameter(1)
+    
+    start_ind = -200
+    stop_ind  = 200
+    step_ind  = 5
+    deriv_0 = harmonic_deriv_data.fitValueY(1.0*(start_ind - step_ind))
+    deriv_1 = harmonic_deriv_data.fitValueY(1.0*start_ind)
+    phase_min_pos = None
+    phase_max_pos = None
+    for ind in range(start_ind,stop_ind,step_ind):
+        phase0 = 1.0*(ind - step_ind)
+        phase1 = 1.0*ind
+        deriv_1 = harmonic_deriv_data.fitValueY(phase1)
+        if(deriv_1*deriv_0 < 0.):
+            if(deriv_0 < 0. and phase_min_pos == None):
+                #---- we found min
+                phase_min_pos = (phase0 + phase1)/2.
+            if(deriv_0 > 0. and phase_max_pos == None):
+                #---- we found max
+                phase_max_pos = (phase0 + phase1)/2.
+        if(deriv_1*deriv_0 == 0.):
+            if(deriv_0 == 0. and deriv_1 > 0 and phase_min_pos == None):
+                #---- we found min
+                phase_min_pos = phase0
+            if(deriv_1 == 0. and deriv_0 < 0 and phase_min_pos == None):
+                #---- we found min
+                phase_min_pos = phase1
+            if(deriv_0 == 0. and deriv_1 < 0 and phase_max_pos == None):
+                #---- we found max
+                phase_max_pos = phase0
+            if(deriv_1 == 0. and deriv_0 > 0 and phase_max_pos == None):
+                #---- we found max
+                phase_max_pos = phase1                
+        #----------------
+        deriv_0 = deriv_1
+
     phase_min_pos = phaseNearTargetPhaseDeg(phase_min_pos,0.)
     phase_max_pos = phaseNearTargetPhaseDeg(phase_max_pos,0.)
+    phase_min_pos = findCosLikeMinPhasePos(harmonic_data,harmonic_deriv_data,phase_min_pos)
+    phase_max_pos = findCosLikeMaxPhasePos(harmonic_data,harmonic_deriv_data,phase_max_pos)
+    phase_min_pos = phaseNearTargetPhaseDeg(phase_min_pos,0.)
+    phase_max_pos = phaseNearTargetPhaseDeg(phase_max_pos,0.)
+    
+    for ind in range(phase_func.getSize()):
+        x = phase_func.x(ind)
+        y = phase_func.y(ind)
+        y_fit = harmonic_data.fitValueY(x)
+        phase_fit_func.add(x,y_fit,abs(y-y_fit))
+    
     return (amp1,avg_value,phase_min_pos,phase_max_pos,phase_fit_func)
 
 def findCosLikeMinPhasePos(harmonic_data,harmonic_deriv_data,phase_guess):
     phase_min =  phaseNearTargetPhaseDeg(phase_guess,0.)
     count_max = 30
-    phase_step = 25.
+    phase_step = 10.
     delta = 0.01
     phase_0 = phase_min - phase_step
     phase_1 = phase_min + phase_step
@@ -262,7 +415,7 @@ def findCosLikeMinPhasePos(harmonic_data,harmonic_deriv_data,phase_guess):
 def findCosLikeMaxPhasePos(harmonic_data,harmonic_deriv_data,phase_guess):
     phase_max =  phaseNearTargetPhaseDeg(phase_guess,0.)
     count_max = 30
-    phase_step = 25.
+    phase_step = 10.
     delta = 0.01
     phase_0 = phase_max - phase_step
     phase_1 = phase_max + phase_step
@@ -292,19 +445,12 @@ def findCosLikeMaxPhasePos(harmonic_data,harmonic_deriv_data,phase_guess):
         if(v == 0.):
             return phase
         if(v1*v > 0.):
-            v0 = v
-            phase_0 = phase
-        else:
             v1 = v
             phase_1 = phase
+        else:
+            v0 = v
+            phase_0 = phase
     return phase            
-
-
-
-
-
-
-
 
 if __name__ == '__main__':
     
