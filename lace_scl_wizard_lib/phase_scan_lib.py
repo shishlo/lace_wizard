@@ -15,6 +15,7 @@ import epics
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Slot, Signal
 
 from statistics_lib.statistics import fitCosineFunc, calculateAvgErr
+from statistics_lib.statistics import fitHarmonicData
 
 #------------------------------------------------------------------------
 #           Auxiliary SCAN classes and functions
@@ -84,9 +85,12 @@ class PhaseScan_Runner(QRunnable):
                 cav_wrapper.model_cav.setCavityModelBlanking(blanking)
             
     def initAmpPhaseFunctions(self,cav_wrapper):
-        cav_wrapper.bpm_amp_phase_dict = {}
+        #cav_wrapper.bpm_amp_phase_dict = {}
         for bpm_wrapper in cav_wrapper.bpm_wrappers:
-            cav_wrapper.bpm_amp_phase_dict[bpm_wrapper.getAlias()] = (Function(),Function())
+            (bpm_amp_func,bpm_amp_func) = cav_wrapper.bpm_amp_phase_dict[bpm_wrapper.getAlias()]
+            bpm_amp_func.clean()
+            bpm_amp_func.clean()
+            #cav_wrapper.bpm_amp_phase_dict[bpm_wrapper.getAlias()] = (Function(),Function())
 
     def measureBPMsVsCavPhase(self,cav_wrapper,cav_phase):
         #---- fake phase scan function -------------------------
@@ -180,7 +184,7 @@ class PhaseScan_Runner(QRunnable):
             return
         phaseDiffBPM01_func = cav_wrapper.phaseDiffBPM01_func
         phaseDiffBPM01_fit_func = cav_wrapper.phaseDiffBPM01_fit_func
-        (sin_amp,phase_offset,avg_val) = fitCosineFunc(phaseDiffBPM01_func,phaseDiffBPM01_fit_func)
+        (sin_amp,avg_value,phase_min_pos,phase_max_pos,func_tmp) = fitHarmonicData(phaseDiffBPM01_func,phaseDiffBPM01_fit_func)
         cav_wrapper.sin_phase_func_amp = sin_amp
         max_err = 0.
         for ind in range(phaseDiffBPM01_func.getSize()):
@@ -192,9 +196,9 @@ class PhaseScan_Runner(QRunnable):
         epicsPhase = 0.
         if(keep_phases):
             epicsPhase = cav_wrapper.epicsPhaseInit
-            cav_wrapper.synch_acc_phase = phaseNearTargetPhaseDeg(epicsPhase + phase_offset,0.)
+            cav_wrapper.synch_acc_phase = phaseNearTargetPhaseDeg(epicsPhase - phase_min_pos,0.)
         else:
-            epicsPhase = phaseNearTargetPhaseDeg(cav_wrapper.synch_acc_phase - phase_offset,0.)
+            epicsPhase = phaseNearTargetPhaseDeg(cav_wrapper.synch_acc_phase + phase_min_pos,0.)
             #print ("cav=",cav_wrapper.getAlias(),"phase_offset = ",phase_offset," new_phase=",epicsPhase)
         cav_wrapper.setEPICS_CavityPhase(epicsPhase)
             
@@ -207,7 +211,6 @@ class PhaseScan_Runner(QRunnable):
         cav_stop = self.cav_wrappers[-1].getAlias()
         msg_txt = "Phase scan started with cvity = " + cav_start + " to " + cav_stop
         self.signals.scan_data_changed.emit(("status_update",msg_txt))
-        ######self.cavs_table_view.clearSelection()
         phase_step = self.phase_scan_step_spin_box.value()
         sleep_time = self.scan_wait_time_spin_box.value()
         n_pulses = int(self.stat_for_in_enrg_spin_box.value())
@@ -227,29 +230,6 @@ class PhaseScan_Runner(QRunnable):
             self.blankCavities(cav_ind)
             self.signals.scan_data_changed.emit(("table_selection_set",cav_ind))
             time.sleep(sleep_time)   
-            #---- collect statistics for energy measurents
-            """
-            #----- ???????????????????? This part should be removed  START
-            if(self.eKin_measure_checkbox.isChecked()):
-                bpm_sleep_time = 1.1
-                eKin_guess = cav_wrapper.eKin_guess
-                energy_meter = self.lace_scl_wizard.getEneryMeter()
-                (eKin, eKin_err, bpm_wrappers, amp_pos_func, phase_pos_func, *rest) = energy_meter.measureEnergy(cav_wrapper,eKin_guess,n_pulses,bpm_sleep_time,min_bpm_amp)
-                if(self.scan_stopper.getShouldStop() or abs(eKin) < 0.1 ):
-                    if(self.scan_stopper.getShouldStop()): self.scan_status_text.setText("Phase scan stopped by user request.")
-                    if(abs(eKin) < 0.1):
-                         msg_txt = "Phase scan stopped with error. Cav="+cav_start
-                         self.signals.scan_data_changed.emit(("status_update",msg_txt))
-                    self.scan_stopper.setShouldStop(False)
-                    self.scan_stopper.setIsRunning(False)
-                    self.signals.scan_data_changed.emit(("status_update","Scan stopped by user's request"))
-                    self.signals.scan_data_changed.emit(("table_selection_set",cav_ind))
-                    return
-                cav_wrapper.eKin_guess = eKin
-                cav_wrapper.eKin_guess_err = eKin_err
-                cav_wrapper.bpm_amp_phase_entrance_funcions = (amp_pos_func, phase_pos_func)
-            #----- ???????????????????? This part should be removed   STOP
-            """
             #---- scan process
             self.initAmpPhaseFunctions(cav_wrapper)
             cav_phase_init = cav_wrapper.getEPICS_CavityPhase()
