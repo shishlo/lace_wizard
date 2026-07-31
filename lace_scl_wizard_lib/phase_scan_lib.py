@@ -64,8 +64,6 @@ class PhaseScan_Runner(QRunnable):
         self.phase_scan_step_spin_box = self.cavs_scan_cntrl.upper_panel_cntrl.phase_scan_step_spin_box
         self.max_sin_amp_err_spin_box = self.cavs_scan_cntrl.upper_panel_cntrl.max_sin_amp_err_spin_box
         self.bpm_min_amp_spin_box = self.cavs_scan_cntrl.bottom_panel_cntrl.bpm_min_amp_spin_box
-        self.stat_for_in_enrg_spin_box = self.cavs_scan_cntrl.upper_panel_cntrl.stat_for_in_enrg_spin_box
-        self.wrap_phase_checkbox = self.cavs_scan_cntrl.upper_panel_cntrl.wrap_phase_checkbox
         self.keep_phases_checkbox = self.cavs_scan_cntrl.upper_panel_cntrl.keep_phases_checkbox
         #---------------------------------------
         self.scan_stopper = self.cavs_scan_cntrl.scan_stopper
@@ -213,12 +211,12 @@ class PhaseScan_Runner(QRunnable):
         self.signals.scan_data_changed.emit(("status_update",msg_txt))
         phase_step = self.phase_scan_step_spin_box.value()
         sleep_time = self.scan_wait_time_spin_box.value()
-        n_pulses = int(self.stat_for_in_enrg_spin_box.value())
         min_bpm_amp = self.bpm_min_amp_spin_box.value()
         iter_count = 0
         time_start = time.time()
         self.signals.scan_data_changed.emit(("table_selection_clear",))
         for cav_wrapper in self.cav_wrappers:
+            self.signals.scan_data_changed.emit(("clean_bpm_phases_plot",cav_wrapper))
             self.signals.scan_data_changed.emit(("update_bpm_phases_plot",cav_wrapper))
             cav_start = cav_wrapper.getAlias()
             scav_stop = self.cav_wrappers[-1].getAlias()
@@ -256,13 +254,13 @@ class PhaseScan_Runner(QRunnable):
             self.setNewEPICS_CavityPhase(cav_wrapper)
             self.signals.scan_data_changed.emit(("update_bpm_phases_plot",cav_wrapper))         
             cav_wrapper.isMeasured = True
-            self.signals.scan_data_changed.emit(("table_changed",))
+            self.signals.scan_data_changed.emit(("table_cavity_data_cahnged",cav_wrapper))
             time.sleep(sleep_time)
         #--------- END of SCAN
         time_scan = time.time() - time_start
         msg_txt = "Phase scan finished. Time[sec] = "+"%7.1f"%time_scan
         self.signals.scan_data_changed.emit(("status_update",msg_txt))
-        self.signals.scan_data_changed.emit(("table_changed",))
+        self.signals.scan_data_changed.emit(("table_changed"))
         self.scan_stopper.setShouldStop(False)
         self.scan_stopper.setIsRunning(False)
         return

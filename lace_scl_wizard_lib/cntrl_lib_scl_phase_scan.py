@@ -296,6 +296,11 @@ class Cavs_Scan_Cntrl:
             msg_txt = rest[0]
             self.upper_panel_cntrl.scan_status_text.setText(msg_txt)
             return
+        if(update_type == "clean_bpm_phases_plot"):
+            cav_wrapper = rest[0]
+            cav_wrapper.phaseDiffBPM01_func.clean()
+            cav_wrapper.phaseDiffBPM01_fit_func.clean()
+            return 
         if(update_type == "update_bpm_phases_plot"):
             cav_wrapper = rest[0]
             (x_arr,y_arr,y_err_arr) = cav_wrapper.phaseDiffBPM01_func.getXYErrLists()
@@ -313,7 +318,11 @@ class Cavs_Scan_Cntrl:
             return
         if(update_type == "table_changed"):
             self.cavs_data_table_model.tableChanged() 
-            return          
+            return
+        if(update_type == "table_cavity_data_cahnged"):
+            cav_wrapper = rest[0]
+            self.cavs_data_table_model._updateItemsFromData(cav_wrapper)
+            return
         return
 
     def stopAllThreads(self):
@@ -474,33 +483,24 @@ class UpperScanPanelCntrl:
 
         self.sync_phase_double_spin_box = QDoubleSpinBox()
         self.sync_phase_double_spin_box.setRange(-180.0, 180.0) # Set min/max range
-        self.sync_phase_double_spin_box.setDecimals(1)          # Set precision to 2 decimal places
-        self.sync_phase_double_spin_box.setSingleStep(0.1)      # Set step size for arrow buttons
+        self.sync_phase_double_spin_box.setDecimals(2)          # Set precision to 2 decimal places
+        self.sync_phase_double_spin_box.setSingleStep(0.5)      # Set step size for arrow buttons
         self.sync_phase_double_spin_box.setValue(-15.0)         # Set default value
 
         scan_wait_time_label = QLabel("   Scan Wait t[sec]=")
         self.scan_wait_time_spin_box = QDoubleSpinBox()
         self.scan_wait_time_spin_box.setRange(0.,10.)    # Set min/max range
-        self.scan_wait_time_spin_box.setDecimals(2)      # Set precision to 2 decimal places
+        self.scan_wait_time_spin_box.setDecimals(2)      # Set precision to 4 decimal places
         self.scan_wait_time_spin_box.setSingleStep(0.05) # Set step size for arrow buttons
         self.scan_wait_time_spin_box.setValue(0.5)       # Set default value
 
         max_sin_amp_err_label = QLabel("    Max Sin Amp. Err[deg]=")
         self.max_sin_amp_err_spin_box = QDoubleSpinBox()
         self.max_sin_amp_err_spin_box.setRange(0.,180.)   # Set min/max range
-        self.max_sin_amp_err_spin_box.setDecimals(1)      # Set precision to 2 decimal places
+        self.max_sin_amp_err_spin_box.setDecimals(2)      # Set precision to 4 decimal places
         self.max_sin_amp_err_spin_box.setSingleStep(0.5)  # Set step size for arrow buttons
         self.max_sin_amp_err_spin_box.setValue(4.0)       # Set default value
-
-        stat_for_in_enrg_label = QLabel(html.unescape("&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Statistics for E<sub>kin</sub>="))
-        self.stat_for_in_enrg_spin_box = QDoubleSpinBox()
-        self.stat_for_in_enrg_spin_box.setRange(1.,30.)    # Set min/max range
-        self.stat_for_in_enrg_spin_box.setDecimals(0)      # Set precision to 2 decimal places
-        self.stat_for_in_enrg_spin_box.setSingleStep(1)    # Set step size for arrow buttons
-        self.stat_for_in_enrg_spin_box.setValue(3.0)       # Set default value
         
-        self.wrap_phase_checkbox = QCheckBox("Wrap Phases")
-        self.wrap_phase_checkbox.setChecked(True)
         self.keep_phases_checkbox = QCheckBox("Keep Cavs Phases")
         self.keep_phases_checkbox.setChecked(False)
 
@@ -510,10 +510,7 @@ class UpperScanPanelCntrl:
         hor_layout_1.addWidget(self.scan_wait_time_spin_box)
         hor_layout_1.addWidget(max_sin_amp_err_label)
         hor_layout_1.addWidget(self.max_sin_amp_err_spin_box)
-        hor_layout_1.addWidget(stat_for_in_enrg_label)
-        hor_layout_1.addWidget(self.stat_for_in_enrg_spin_box)
         hor_layout_1.addWidget(QLabel("   "))
-        hor_layout_1.addWidget(self.wrap_phase_checkbox)
         hor_layout_1.addWidget(self.keep_phases_checkbox)  
 
         #----------------------------------------------
@@ -711,37 +708,48 @@ class CavsScanDataTableModel(LACE_DataTableModel):
     def handleItemChanged(self, item):
         pass
 
-    def _updateItemsFromData(self):
-        for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):
-            #---- cavity is good
-            self._updateBoolItem(cav_wrapper.isGood,self.item(cav_ind,1))
-            if(not cav_wrapper.isGood):
-                cav_wrapper.modelAmp = 0.
-                cav_wrapper.model_cav.setModelAmp(cav_wrapper.modelAmp)
-                cav_wrapper.isMeasured = False
-                self._updateBoolItem(cav_wrapper.isMeasured,self.item(cav_ind,2))
-                for ind in range(3,10):
-                    self.item(cav_ind,ind).setText("")
-                continue
+    def _updateItemsFromData(self,cav_wrapper = None):
+        if(cav_wrapper == None):
+            for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):
+              self._updateItemsFromDataForCavity(cav_ind,cav_wrapper)  
+        else:
+            cav_ind = self.cav_wrappers.index(cav_wrapper)
+            self._updateItemsFromDataForCavity(cav_ind,cav_wrapper)
+
+    def _updateItemsFromDataForCavity(self,cav_ind,cav_wrapper):
+        #---- cavity is good
+        self._updateBoolItem(cav_wrapper.isGood,self.item(cav_ind,1))
+        if(not cav_wrapper.isGood):
+            cav_wrapper.modelAmp = 0.
+            cav_wrapper.model_cav.setModelAmp(cav_wrapper.modelAmp)
+            cav_wrapper.isMeasured = False
             self._updateBoolItem(cav_wrapper.isMeasured,self.item(cav_ind,2))
-            #--------------------------------
-            if(cav_ind == 0):
-                for item_ind in range(3,self.columnCount()):
-                    item = self.item(cav_ind,item_ind)
-                    item.setText("")
-                continue
-            #--------------------------------
-            bpm1_item = self.item(cav_ind,3)
-            if(cav_wrapper.bpm_wrapper0 != None):
-                bpm1_item.setText("%10s"%cav_wrapper.bpm_wrapper0.getAlias())
-            else:
-                 bpm1_item.setText("")
-            bpm2_item = self.item(cav_ind,4)
-            if(cav_wrapper.bpm_wrapper1 != None):
-                bpm2_item.setText("%10s"%cav_wrapper.bpm_wrapper1.getAlias())
-            else:
-                 bpm2_item.setText("")
-            epics_phase_old_item = self.item(cav_ind,5) ; epics_phase_old_item.setText("%+6.1f"%cav_wrapper.epicsPhaseInit)
+            for ind in range(3,10):
+                self.item(cav_ind,ind).setText("")
+            return
+        self._updateBoolItem(cav_wrapper.isMeasured,self.item(cav_ind,2))
+        #--------------------------------
+        if(cav_ind == 0):
+            for item_ind in range(3,self.columnCount()):
+                item = self.item(cav_ind,item_ind)
+                item.setText("")
+            return
+        #--------------------------------
+        bpm1_item = self.item(cav_ind,3)
+        if(cav_wrapper.bpm_wrapper0 != None):
+            bpm1_item.setText("%10s"%cav_wrapper.bpm_wrapper0.getAlias())
+        else:
+             bpm1_item.setText("")
+        bpm2_item = self.item(cav_ind,4)
+        if(cav_wrapper.bpm_wrapper1 != None):
+            bpm2_item.setText("%10s"%cav_wrapper.bpm_wrapper1.getAlias())
+        else:
+             bpm2_item.setText("")
+        epics_phase_old_item = self.item(cav_ind,5) ; epics_phase_old_item.setText("%+6.1f"%cav_wrapper.epicsPhaseInit)
+        if(not cav_wrapper.isMeasured):
+            for ind in range(6,10):
+                self.item(cav_ind,ind).setText("")
+        else:
             epics_phase_new_item = self.item(cav_ind,6) ; epics_phase_new_item.setText("%+6.1f"%cav_wrapper.epicsPhase)
             scan_phase_sinAmp_item = self.item(cav_ind,7) ; scan_phase_sinAmp_item.setText("%6.1f"%cav_wrapper.sin_phase_func_amp)
             scan_phase_errAmp_item = self.item(cav_ind,8) ; scan_phase_errAmp_item.setText("%5.1f"%cav_wrapper.sin_phase_func_amp_err)      

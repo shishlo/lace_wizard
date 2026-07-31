@@ -349,7 +349,7 @@ class CavsScanDataAnalysisTableModel(LACE_DataTableModel):
         headers += ["E-In(MeV)","E-Out(MeV)",html.unescape("&delta;E(k/k-1)(keV)")]
         headers += [html.unescape("&delta;E-fit(keV)"),]
         headers += ["E0TL[MeV]","Model-E-Out","CavAmp(MV)","CavAmp(%)"]
-        headers += [html.unescape("&phi;-1stGap"),html.unescape("&phi;-synch")]
+        headers += [html.unescape("&phi;-1stGap"),html.unescape("&phi;-Accel.")]
         self.setHorizontalHeaderLabels(headers)
         for cav_ind,cav_wrapper in enumerate(self.cav_wrappers):
             name_item = QStandardItem(cav_wrapper.getAlias())
