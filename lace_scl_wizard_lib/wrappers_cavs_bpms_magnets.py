@@ -56,6 +56,7 @@ class Cavity_Wrapper:
         self.epicsPhase = 0.
         self.epicsAmpInit = 0.
         self.epicsPhaseInit = 0.
+        self.epicsAmpGoal = 0.
         #-- design parameters will be defined after analysis of the phase scan data
         self.modelAmp = 0.
         self.modelPhase = 0.       
@@ -88,7 +89,9 @@ class Cavity_Wrapper:
             pv_name_start = "CCL_LLRF:FCM" + tank_number_str + ":"
         self.cav_amp_pv = epics.PV(pv_name_start + "CtlAmpSet")
         self.cav_phase_pv = epics.PV(pv_name_start + "CtlPhaseSet")
-        self.cav_blankig_pv = epics.PV(pv_name_start + "BlnkBeam")       
+        self.cav_blankig_pv = epics.PV(pv_name_start + "BlnkBeam")
+        #---- Amplitude Set Goal value PV
+        self.cav_ampl_goal_pv = epics.PV(pv_name_start + "cavAmpGoal")   
         
     def getAlias(self):
         return self.alias 
@@ -104,6 +107,7 @@ class Cavity_Wrapper:
         self.epicsPhase = 0.
         self.epicsAmpInit = 0.
         self.epicsPhaseInit = 0.
+        self.epicsAmpGoal = 0.
         #---- scan results cleaning
         for bpm_wrapper in self.bpm_wrappers:
             self.bpm_amp_phase_dict[bpm_wrapper.getAlias()][0].clean()
@@ -146,7 +150,7 @@ class Cavity_Wrapper:
     def connectPVs(self):
         self.is_connected = True
         if(self.cav_amp_pv.connected and self.cav_phase_pv.connected \
-            and self.cav_blankig_pv.connected):
+            and self.cav_blankig_pv.connected and self.cav_ampl_goal_pv.connected):
             return self.is_connected
         self.is_connected = False
         return self.is_connected
@@ -178,6 +182,11 @@ class Cavity_Wrapper:
         if(self.is_connected):
             return self.cav_amp_pv.get()
         return self.epicsAmp
+        
+    def getEPICS_CavityAmpGoal(self):
+        if(self.is_connected):
+            self.epicsAmpGoal = self.cav_amp_goal_pv.get()
+        return self.epicsAmpGoal
 
     def setEPICS_CavityPhase(self,epics_cav_phase):
         if(self.is_connected):

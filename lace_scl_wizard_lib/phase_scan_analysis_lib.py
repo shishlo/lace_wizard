@@ -106,18 +106,22 @@ class Analysis_Runner(QRunnable):
         self.signals.analysis_data_changed.emit(("status_update",msg_txt))
         min_bpm_amp = self.bpm_min_amp_spin_box.value()
         iter_count = 0
-        time_start = time.time()  
+        time_start = time.time()
+        cavs_count = 0
         #self.signals.analysis_data_changed.emit(("table_selection_clear",))
         for cav_local_ind,cav_wrapper in enumerate(self.cav_wrappers):
             #---- cav index in the global table
             cav_ind = self.cavs_data_analysis_table_model.cav_wrappers.index(cav_wrapper)
+            #---- 
             #---- May be we want to stop
             if(self.analysis_stopper.getShouldStop()):
+                time_scan = time.time() - time_start
                 self.analysis_stopper.setShouldStop(False)
                 self.analysis_stopper.setIsRunning(False)
                 self.cleanAllDownstreamCavities(cav_wrapper)
                 msg_txt  = "Analysis stopped by user's request at cavity="
                 msg_txt += cav_wrapper.getAlias()
+                msg_txt += "    Run time[sec] = %7.1f    "%time_scan
                 self.signals.analysis_data_changed.emit(("status_update",msg_txt))
                 self.signals.analysis_data_changed.emit(("table_selection_set",cav_ind))
                 self.signals.analysis_data_changed.emit(("table_changed",))
@@ -127,6 +131,12 @@ class Analysis_Runner(QRunnable):
             cav_start = cav_wrapper.getAlias()
             cav_stop = self.cav_wrappers[-1].getAlias()
             msg_txt = "Analysis cavity = " + cav_start + " to " + cav_stop
+            if(cavs_count > 0):
+                time_scan = time.time() - time_start
+                one_cav_time = time_scan/cavs_count
+                eta_time = one_cav_time*(len(self.cav_wrappers) - cavs_count)
+                msg_txt += "    Run time[sec] = %7.1f    "%time_scan
+                msg_txt += " ETA = %7.1f"%eta_time
             self.signals.analysis_data_changed.emit(("status_update",msg_txt))
             if(cav_wrapper.isGood == False):
                 cav_wrapper_previous = self.cavs_data_analysis_table_model.cav_wrappers[cav_ind-1]
@@ -151,7 +161,7 @@ class Analysis_Runner(QRunnable):
                 msg_txt  = "Analysis stopped. No scan data for cavity="
                 msg_txt += cav_wrapper.getAlias()
                 msg_txt += " Cannot continue."
-                msg_txt += " Execution time[sec] = "+"%7.1f"%time_scan                     
+                msg_txt += " Run time[sec] = %7.1f"%time_scan                     
                 self.signals.analysis_data_changed.emit(("status_update",msg_txt))
                 self.signals.analysis_data_changed.emit(("table_selection_set",cav_ind))
                 self.signals.analysis_data_changed.emit(("table_changed",)) 
@@ -251,13 +261,16 @@ class Analysis_Runner(QRunnable):
                 cav_wrapper_next.eKin_model_in = cav_wrapper.eKin_model_out
             #---- Update information in the table for the cavity
             self.signals.analysis_data_changed.emit(("table_cavity_data_cahnged",cav_wrapper))
+            cavs_count += 1
             #---- Stop scan analysis if requested
             if(self.analysis_stopper.getShouldStop()):
+                time_scan = time.time() - time_start
                 self.analysis_stopper.setShouldStop(False)
                 self.analysis_stopper.setIsRunning(False)
                 self.cleanAllDownstreamCavities(cav_wrapper)
                 msg_txt  = "Analysis stopped by user's request at cavity="
                 msg_txt += cav_wrapper.getAlias()
+                msg_txt += "   Run time[sec] = %7.1f"%time_scan 
                 self.signals.analysis_data_changed.emit(("status_update",msg_txt))
                 self.signals.analysis_data_changed.emit(("table_selection_set",cav_ind))
                 self.signals.analysis_data_changed.emit(("table_changed",))

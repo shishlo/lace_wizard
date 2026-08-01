@@ -179,7 +179,7 @@ class PhaseScan_Runner(QRunnable):
         (acceleration) phase.
         """
         if(cav_wrapper.getAlias() == "CCL4"):
-            return
+            return True
         phaseDiffBPM01_func = cav_wrapper.phaseDiffBPM01_func
         phaseDiffBPM01_fit_func = cav_wrapper.phaseDiffBPM01_fit_func
         (sin_amp,avg_value,phase_min_pos,phase_max_pos,func_tmp) = fitHarmonicData(phaseDiffBPM01_func,phaseDiffBPM01_fit_func)
@@ -189,6 +189,9 @@ class PhaseScan_Runner(QRunnable):
             diff = abs(phaseDiffBPM01_func.y(ind) - phaseDiffBPM01_fit_func.y(ind))
             if(diff > max_err): max_err = diff
         cav_wrapper.sin_phase_func_amp_err = max_err
+        max_sin_amp_err = self.max_sin_amp_err_spin_box.value()
+        if(max_err > max_sin_amp_err):
+            return False
         #---- Set epics phase
         keep_phases = self.keep_phases_checkbox.isChecked()
         epicsPhase = 0.
@@ -199,6 +202,7 @@ class PhaseScan_Runner(QRunnable):
             epicsPhase = phaseNearTargetPhaseDeg(cav_wrapper.synch_acc_phase + phase_min_pos,0.)
             #print ("cav=",cav_wrapper.getAlias(),"phase_offset = ",phase_offset," new_phase=",epicsPhase)
         cav_wrapper.setEPICS_CavityPhase(epicsPhase)
+        return True
             
     @Slot()
     def run(self):
@@ -214,31 +218,64 @@ class PhaseScan_Runner(QRunnable):
         min_bpm_amp = self.bpm_min_amp_spin_box.value()
         iter_count = 0
         time_start = time.time()
+        cavs_count = 0
         self.signals.scan_data_changed.emit(("table_selection_clear",))
         for cav_wrapper in self.cav_wrappers:
+             #---- cav index in the table
+            cav_ind = self.cavs_data_table_model.cav_wrappers.index(cav_wrapper)           
             self.signals.scan_data_changed.emit(("clean_bpm_phases_plot",cav_wrapper))
             self.signals.scan_data_changed.emit(("update_bpm_phases_plot",cav_wrapper))
             cav_start = cav_wrapper.getAlias()
             scav_stop = self.cav_wrappers[-1].getAlias()
-            msg_txt = "Phase scan started with cvity = " + cav_start + " to " + cav_stop
+            msg_txt = "Phase scan started with cavity = " + cav_start + " to " + cav_stop
+            if(cavs_count > 0):
+                time_scan = time.time() - time_start
+                one_cav_time = time_scan/cavs_count
+                eta_time = one_cav_time*(len(self.cav_wrappers) - cavs_count)
+                msg_txt += "    Run time[sec] = %7.1f    "%time_scan
+                msg_txt += " ETA = %7.1f"%eta_time            
             self.signals.scan_data_changed.emit(("status_update",msg_txt))
-            if(cav_wrapper.isGood == False): continue
-            #---- cav index in the table
-            cav_ind = self.cavs_data_table_model.cav_wrappers.index(cav_wrapper)
-            self.blankCavities(cav_ind)
-            self.signals.scan_data_changed.emit(("table_selection_set",cav_ind))
-            time.sleep(sleep_time)   
-            #---- scan process
+            if(cav_wrapper.isGood == False): 
+                cav_wrapper.isMeasured = False
+                cav_wrapper.isAnalyzed = False               
+                continue
+            #---- clean all plots and data for scan
             self.initAmpPhaseFunctions(cav_wrapper)
+            self.signals.scan_data_changed.emit(("table_selection_set",cav_ind))
+            #---- Check if cavity not fully up to the goal amplitude
+            cav_amp = cav_wrapper.getEPICS_CavityAmp()
+            cav_amp_goal = cav_wrapper.getEPICS_CavityAmp()
+            if(abs(cav_amp-cav_amp_goal) > 0.01):
+                time_scan = time.time() - time_start          
+                self.scan_stopper.setShouldStop(False)
+                self.scan_stopper.setIsRunning(False)
+                msg_txt  = "Scan stopped. Cavity="
+                msg_txt += cav_wrapper.getAlias()
+                msg_txt += " Amp != AmpGoal   "
+                msg_txt += " %6.3f != %6.3f "%(cav_amp,cav_amp_goal)
+                msg_txt += "  Run time[sec] = %7.1f"%time_scan                     
+                self.signals.scan_data_changed.emit(("status_update",msg_txt))
+                self.signals.scan_data_changed.emit(("table_selection_set",cav_ind))
+                self.signals.scan_data_changed.emit(("table_changed",)) 
+                return
+            #---- Set all downstream cavities blanked
+            self.blankCavities(cav_ind)
+            #---- start phase scan process for this cavity
             cav_phase_init = cav_wrapper.getEPICS_CavityPhase()
             cav_phase = -180.
             while(cav_phase <= 180.):
                 if(self.scan_stopper.getShouldStop()):
+                    time_scan = time.time() - time_start
                     self.scan_stopper.setShouldStop(False)
                     self.scan_stopper.setIsRunning(False)
                     if(cav_wrapper.getAlias() != "CCL4"):
                         cav_wrapper.setEPICS_CavityPhase(cav_phase_init)
-                    self.signals.scan_data_changed.emit(("status_update","Scan stopped by user's request"))
+                    time.sleep(sleep_time)
+                    msg_txt = "Stopped by user's request at cavity = "
+                    msg_txt += cav_wrapper.getAlias()
+                    msg_txt += " phase= %+6.1f"%cav_phase
+                    msg_txt += " Run time[sec] = %7.1f"%time_scan
+                    self.signals.scan_data_changed.emit(("status_update",msg_txt))
                     self.signals.scan_data_changed.emit(("table_selection_set",cav_ind))
                     return
                 #------------------------------------------
@@ -251,11 +288,25 @@ class PhaseScan_Runner(QRunnable):
             if(cav_wrapper.getAlias() != "CCL4"):
                 cav_wrapper.setEPICS_CavityPhase(cav_phase_init)
             result = self.wrappAllPhasesForBPMs(cav_wrapper)
-            self.setNewEPICS_CavityPhase(cav_wrapper)
+            result_err_bool = self.setNewEPICS_CavityPhase(cav_wrapper)
             self.signals.scan_data_changed.emit(("update_bpm_phases_plot",cav_wrapper))         
             cav_wrapper.isMeasured = True
             self.signals.scan_data_changed.emit(("table_cavity_data_cahnged",cav_wrapper))
             time.sleep(sleep_time)
+            if(not result_err_bool):
+                time_scan = time.time() - time_start          
+                self.scan_stopper.setShouldStop(False)
+                self.scan_stopper.setIsRunning(False)
+                msg_txt  = "Scan stopped. Cavity="
+                msg_txt += cav_wrapper.getAlias()
+                msg_txt += " Errors for sin-fiiting are too big! "
+                msg_txt += " Run time[sec] = %7.1f"%time_scan                     
+                self.signals.scan_data_changed.emit(("status_update",msg_txt))
+                self.signals.scan_data_changed.emit(("table_selection_set",cav_ind))
+                self.signals.scan_data_changed.emit(("table_changed",)) 
+                return                
+            #--------------
+            cavs_count += 1
         #--------- END of SCAN
         time_scan = time.time() - time_start
         msg_txt = "Phase scan finished. Time[sec] = "+"%7.1f"%time_scan

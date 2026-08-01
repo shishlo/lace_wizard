@@ -706,7 +706,12 @@ class CavsScanDataTableModel(LACE_DataTableModel):
 
     @Slot("QStandardItem*")
     def handleItemChanged(self, item):
-        pass
+        col = item.column()
+        if(col != 9): return
+        cav_ind = item.row()
+        txt = item.text()
+        if(txt != ""):
+            self.cav_wrappers[cav_ind].synch_acc_phase = float(txt)
 
     def _updateItemsFromData(self,cav_wrapper = None):
         if(cav_wrapper == None):
@@ -747,8 +752,9 @@ class CavsScanDataTableModel(LACE_DataTableModel):
              bpm2_item.setText("")
         epics_phase_old_item = self.item(cav_ind,5) ; epics_phase_old_item.setText("%+6.1f"%cav_wrapper.epicsPhaseInit)
         if(not cav_wrapper.isMeasured):
-            for ind in range(6,10):
+            for ind in range(6,9):
                 self.item(cav_ind,ind).setText("")
+            synch_phase_item = self.item(cav_ind,9) ; synch_phase_item.setText("%+6.1f"%cav_wrapper.synch_acc_phase)
         else:
             epics_phase_new_item = self.item(cav_ind,6) ; epics_phase_new_item.setText("%+6.1f"%cav_wrapper.epicsPhase)
             scan_phase_sinAmp_item = self.item(cav_ind,7) ; scan_phase_sinAmp_item.setText("%6.1f"%cav_wrapper.sin_phase_func_amp)
