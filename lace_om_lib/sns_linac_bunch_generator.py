@@ -24,7 +24,7 @@ from orbit.utils import speed_of_light
 def get_SCL_EmptyBunch(eKin):
 	"""
 	Keeps the empty bunch for energy and time tracking through SCL and HEBT.
-	eKin in GeV.
+	eKin in MeV.
 	"""
 	bunch = Bunch()
 	syncPart = bunch.getSyncParticle()

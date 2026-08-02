@@ -49,6 +49,10 @@ class XALtoSCL_TuneWizardUpdater:
                 xal_cavity_wrapper = self.scl_scan_reader.getXAL_CavityWrapperDict()["SCL:"+cav_wrapper.getAlias()]
             cav_wrapper.isGood = xal_cavity_wrapper.isGood()
             cav_wrapper.isAnalyzed = xal_cavity_wrapper.isAnalyzed()
+            #---- Technically we cannot consider this cavity analyzed
+            #---- the XAL model is not PyORBIT model. But we allow the user
+            #---- to see parameters in the table.
+            #cav_wrapper.isAnalyzed = False
             (bpm0_name,bpm1_name) = xal_cavity_wrapper.getBPMs01()
             cav_wrapper.eKin_in = xal_cavity_wrapper.eKin_In()
             cav_wrapper.eKin_out = xal_cavity_wrapper.eKin_Out()

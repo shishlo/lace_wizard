@@ -56,9 +56,14 @@ from pyqtgraph import (
     )
 """
 
+# import the utilities
+from orbit.utils import phaseNearTargetPhase, phaseNearTargetPhaseDeg
+
 from gui_lib.borderlayout import BorderLayout, Position
 from gui_lib.style_sheets_lib import StyleSheetFactory
 from gui_lib.table_view_model_lib import LACE_QTableView, LACE_DataTableModel
+from lace_om_lib.sns_linac_bunch_generator import get_SCL_EmptyBunch
+
 from .wrappers_cavs_bpms_magnets import Cavity_Wrapper, BPM_Wrapper
 from .phase_scan_analysis_lib import AnalysisStateController, Analysis_Runner, AnalysisWorkerSignals
 
@@ -290,16 +295,26 @@ class BottomAnalysisPanelCntrl:
         self.bpm_wrappers = self.lace_scl_wizard.getBPM_Wrappers()
         #---- main widget
         self.mainWidget = QFrame()
-        
+
+        self.tabs = QTabWidget()
+        self.tabs.setTabPosition(QTabWidget.TabPosition.West)
+        self.tabs.setMovable(False)        
+
         buttons_style = StyleSheetFactory.pushButtonStyleSheet()
         groupBox_style = StyleSheetFactory.groupBoxStyleSheet()
         
+        #---- Widget with eKin out and fitted model plots
         self.eKin_out_plot = pg.PlotWidget()
+        
+        self.saveParamsOM_Widget = SaveParametersOnlineModelPanelCntrl(self)
+
+        self.tabs.addTab(self.eKin_out_plot,"eKin Out Plot")
+        self.tabs.addTab(self.saveParamsOM_Widget.getMainWidget(),"Save OM Parameters")
         
         central_layout = QHBoxLayout()
         central_layout.setSpacing(0)
-        central_layout.setContentsMargins(0, 0, 0, 0)   
-        central_layout.addWidget(self.eKin_out_plot,1)
+        central_layout.setContentsMargins(0, 0, 0, 0)
+        central_layout.addWidget(self.tabs,1)
         
         self.getMainWidget().setLayout(central_layout)
         
@@ -332,6 +347,80 @@ class BottomAnalysisPanelCntrl:
         eKinOut_line = self.eKin_out_plot.plot(pen=None, symbol="o", symbolSize=5, symbolBrush='r', name=html.unescape("eKinOut <sub>BPM</sub>"))
         eKinOut_line_fit_line = self.eKin_out_plot.plot(pen="white",  linestyle="-", name=html.unescape("Model Fit"))        
         return (eKinOut_line,eKinOut_line_fit_line)
+
+class SaveParametersOnlineModelPanelCntrl:
+    """
+    The tab at the Bottom panel in the Scan Analysis with buttons to 
+    save the Online Model initialization parameters.
+    """
+    def __init__(self,bottom_panel_cntrl):
+        self.bottom_panel_cntrl = bottom_panel_cntrl
+        self.scan_analysis_cntrl = self.bottom_panel_cntrl.scan_analysis_cntrl
+        self.cavs_phase_scan_cntrl = self.scan_analysis_cntrl.cavs_phase_scan_cntrl
+        self.lace_scl_wizard = self.cavs_phase_scan_cntrl.lace_scl_wizard
+        self.scl_om = self.lace_scl_wizard.scl_om
+        self.model_cavs = self.lace_scl_wizard.getOM().getModelCavs()
+        self.cav_wrappers = self.lace_scl_wizard.getCavWrappers()
+        self.bpm_wrappers = self.lace_scl_wizard.getBPM_Wrappers()
+        #---- main widget
+        self.mainWidget = QFrame()
+        
+        buttons_style = StyleSheetFactory.pushButtonStyleSheet()
+        groupBox_style = StyleSheetFactory.groupBoxStyleSheet()
+
+        #-----------------------------------------------------------
+        #---- buttons to write to ASCII Online Model paramaters 
+        #-----------------------------------------------------------
+        saveOM_Action = SaveOM_Action(self)
+        
+        saveAllCavs_button = QPushButton("Save Online Model Parameters",parent=None)
+        saveAllCavs_button.setStyleSheet(buttons_style)
+        saveAllCavs_button.clicked.connect(lambda: saveOM_Action.performAction())
+        
+        saveSlectedCavs_button = QPushButton("Save for Selected Cavities",parent=None)
+        saveSlectedCavs_button.setStyleSheet(buttons_style)
+        saveSlectedCavs_button.clicked.connect(lambda: saveOM_Action.performActionForSelected())
+        
+        save_status_0_text = QLineEdit("Status:")
+        save_status_0_text.setStyleSheet("color: blue; background-color: white;")
+        
+        self.save_status_text = QLineEdit("")
+        self.save_status_text.setStyleSheet("color: red; background-color: white;")       
+
+        hor_view_1 = QWidget()
+        hor_view_2 = QWidget()
+        
+        hor_layout_1 = QHBoxLayout()
+        hor_layout_1.setSpacing(0)
+        hor_layout_1.setContentsMargins(0, 0, 0, 0)
+        hor_layout_1.setAlignment(Qt.AlignLeft)        
+        hor_layout_1.addWidget(saveAllCavs_button)
+        hor_layout_1.addWidget(saveSlectedCavs_button)
+        
+        hor_view_1.setLayout(hor_layout_1)
+        
+        hor_layout_2 = QHBoxLayout()
+        hor_layout_2.setSpacing(0)
+        hor_layout_2.setContentsMargins(0, 0, 0, 0)
+        hor_layout_2.setAlignment(Qt.AlignLeft)        
+        hor_layout_2.addWidget(save_status_0_text)
+        hor_layout_2.addWidget(self.save_status_text,1) 
+        
+        hor_view_2.setLayout(hor_layout_2)
+        
+        ver_layout = QVBoxLayout()
+        ver_layout.setSpacing(0)
+        ver_layout.setContentsMargins(0, 0, 0, 0)
+        ver_layout.setAlignment(Qt.AlignTop)
+        ver_layout.addWidget(hor_view_1)
+        ver_layout.addWidget(hor_view_2)
+        
+        self.getMainWidget().setLayout(ver_layout)
+        
+        
+    def getMainWidget(self):
+        """ Returns the mainWidget (window) """
+        return self.mainWidget
 
 #----------------------------------------------------------
 #  Data Table Model
@@ -525,3 +614,111 @@ class StopAnalysis_Action:
         self.scan_analysis_cntrl = self.upper_panel_cntrl.scan_analysis_cntrl
         self.analysis_stopper = self.scan_analysis_cntrl.analysis_stopper
         self.analysis_stopper.setShouldStop(True)
+        
+class SaveOM_Action:
+    """ 
+    Saves the Online Model parameters into the ASCII file for future use.
+    """
+    def __init__(self,saveParamsOM_Widget):
+        self.saveParamsOM_Widget = saveParamsOM_Widget
+        self.bottom_panel_cntrl = self.saveParamsOM_Widget.bottom_panel_cntrl
+        self.scan_analysis_cntrl = self.bottom_panel_cntrl.scan_analysis_cntrl
+        self.cavs_phase_scan_cntrl = self.scan_analysis_cntrl.cavs_phase_scan_cntrl
+        self.lace_scl_wizard = self.cavs_phase_scan_cntrl.lace_scl_wizard
+        self.scl_om = self.lace_scl_wizard.scl_om
+        self.model_cavs = self.lace_scl_wizard.getOM().getModelCavs()
+        self.cav_wrappers = self.lace_scl_wizard.getCavWrappers()
+        self.bpm_wrappers = self.lace_scl_wizard.getBPM_Wrappers()        
+    
+    def performAction(self):
+        """ Saves OM parameters """
+        self.saveParamsOM_Widget.save_status_text.setText("")
+        cav_wrappers = self.scan_analysis_cntrl.cav_wrappers[1:]
+        cav_wrappers_bad = []
+        for cav_wrapper in cav_wrappers:
+            if(not cav_wrapper.isGood): continue
+            if(not cav_wrapper.isAnalyzed):
+                cav_wrappers_bad.append(cav_wrapper)
+        if(len(cav_wrappers_bad) > 0):
+            txt = "Cannot create OM. Some cavities were not been analyzed. "
+            txt += "Starts with cav.="+cav_wrappers_bad[0].getAlias()
+            self.saveParamsOM_Widget.save_status_text.setText(txt)
+            return
+        self._performAction(cav_wrappers)
+
+    def performActionForSelected(self):
+        """ Saves OM parameters for selected cavities """
+        self.saveParamsOM_Widget.save_status_text.setText("")
+        cav_selection_model = self.scan_analysis_cntrl.cavs_table_view.selectionModel()
+        cav_wrappers = self.scan_analysis_cntrl.cav_wrappers
+        cav_name_column_ind = 0
+        QModelIndex_list = cav_selection_model.selectedIndexes()
+        cavs_list = []
+        for q_model_ind in QModelIndex_list:
+            if(q_model_ind.column() != cav_name_column_ind): continue
+            row = q_model_ind.row()
+            cav_wrapper = cav_wrappers[row]
+            if(not cav_wrapper.isGood):
+                cav_wrapper.cleanAllScanData()
+                #continue
+            if(cav_wrapper.getAlias() == "CCL4"): continue
+            cavs_list.append(cav_wrapper)
+        self._performAction(cavs_list)        
+        
+    def _performAction(self,cav_wrappers):
+        """ 
+        Saves OM parameters for selected cavities.
+        The relation between model and EPICS phases:
+        model_cav_phase = epics_cav_phase + cav_phase_offset
+        cav_phase_offset = model_cav_phase - epics_cav_phase
+        """
+        print ("#  cav_name  model_cav_amp   cav_phase_offset  cav_phase_EPICS eKinIn eKinOut eKinOutBPMs cav_amp_EPICS")
+        for cav_wrapper in cav_wrappers:
+            cav_name = cav_wrapper.getAlias()
+            model_cav_amp = cav_wrapper.model_cav.getModelAmp()
+            #model_cav_phase = cav_wrapper.model_cav.getModelPhase()
+            cav_phase_offset = cav_wrapper.getModelCavityPhaseOffset()
+            cav_phase_EPICS = cav_wrapper.epicsPhase
+            eKin_model_in = cav_wrapper.eKin_model_in
+            eKin_model_out = cav_wrapper.eKin_model_out
+            eKin_BPM_out = cav_wrapper.eKin_out
+            cav_amp_EPICS = cav_wrapper.epicsAmp
+            st = cav_name + " %6.4f "%model_cav_amp + " %+7.2f "%cav_phase_offset
+            st += " %+7.2f "%cav_phase_EPICS + " %9.3f "%eKin_model_in + " %9.3f "%eKin_model_out + " %9.3f "%eKin_BPM_out
+            st += " %8.4f "%cav_amp_EPICS
+            print (st)
+        #---------------------------------
+        self.testOnlineModel(cav_wrappers)
+            
+            
+    def testOnlineModel(self,cav_wrappers):
+        """
+        This test will track bunch through the part of the lattice 
+        after initialization to the found model parameters.
+        """
+        #---- Let's create a copy of the Online Model and use it
+        scl_om = self.scl_om.getCopyOM()
+        model_cavs = scl_om.getModelCavs()
+        for cav_wrapper in cav_wrappers:
+            cav_ind = self.scan_analysis_cntrl.cav_wrappers.index(cav_wrapper)
+            model_cav = model_cavs[cav_ind]
+            model_cav.setCavityPhaseOffset(cav_wrapper.getModelCavityPhaseOffset())
+            model_cav.setModelAmp(cav_wrapper.model_cav.getModelAmp())
+            model_cav.setModelPhase(cav_wrapper.model_cav.getModelPhase())
+            #model_cav.setEPICS_CavityModelPhase(cav_wrapper.epicsPhase)
+        #----------------------
+        bunch = get_SCL_EmptyBunch(cav_wrappers[0].eKin_model_in)
+        cav_ind_start = self.scan_analysis_cntrl.cav_wrappers.index(cav_wrappers[0])
+        cav_ind_stop  = self.scan_analysis_cntrl.cav_wrappers.index(cav_wrappers[-1])
+        model_cav_start = model_cavs[cav_ind_start]
+        model_cav_stop  = model_cavs[cav_ind_stop]
+        (elem_ind_start, tmp_ind) = model_cav_start.getStartStopInds()
+        (tmp_ind, elem_ind_stop) = model_cav_stop.getStartStopInds()
+        scl_om.trackDesignBunch(bunch,elem_ind_start,elem_ind_stop)
+        scl_om.trackBunch(bunch,elem_ind_start,elem_ind_stop)
+        for model_cav in model_cavs[cav_ind_start:cav_ind_stop+1]:
+            (eKin_in,eKin_out) = model_cav.get_eKinInOut()
+            print ("debug cav=",model_cav.getName()," (eKin_in,eKin_out) = %8.3f  %8.3f "%(eKin_in,eKin_out))
+            
+            
+        
