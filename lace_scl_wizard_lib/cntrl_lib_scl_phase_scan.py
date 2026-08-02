@@ -503,6 +503,9 @@ class UpperScanPanelCntrl:
         
         self.keep_phases_checkbox = QCheckBox("Keep Cavs Phases")
         self.keep_phases_checkbox.setChecked(False)
+        
+        self.amp_vs_goal_checkbox = QCheckBox("Check if Cav. Amp != Goal")
+        self.amp_vs_goal_checkbox.setChecked(True)        
 
         hor_layout_1.addWidget(setSynchPhase_button)
         hor_layout_1.addWidget(self.sync_phase_double_spin_box)
@@ -511,7 +514,8 @@ class UpperScanPanelCntrl:
         hor_layout_1.addWidget(max_sin_amp_err_label)
         hor_layout_1.addWidget(self.max_sin_amp_err_spin_box)
         hor_layout_1.addWidget(QLabel("   "))
-        hor_layout_1.addWidget(self.keep_phases_checkbox)  
+        hor_layout_1.addWidget(self.keep_phases_checkbox)
+        hor_layout_1.addWidget(self.amp_vs_goal_checkbox)
 
         #----------------------------------------------
         #---- lower line - hor_view_2 panel

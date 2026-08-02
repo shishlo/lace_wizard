@@ -65,6 +65,7 @@ class PhaseScan_Runner(QRunnable):
         self.max_sin_amp_err_spin_box = self.cavs_scan_cntrl.upper_panel_cntrl.max_sin_amp_err_spin_box
         self.bpm_min_amp_spin_box = self.cavs_scan_cntrl.bottom_panel_cntrl.bpm_min_amp_spin_box
         self.keep_phases_checkbox = self.cavs_scan_cntrl.upper_panel_cntrl.keep_phases_checkbox
+        self.amp_vs_goal_checkbox = self.cavs_scan_cntrl.upper_panel_cntrl.amp_vs_goal_checkbox
         #---------------------------------------
         self.scan_stopper = self.cavs_scan_cntrl.scan_stopper
         self.scan_status_text = self.cavs_scan_cntrl.upper_panel_cntrl.scan_status_text
@@ -245,7 +246,8 @@ class PhaseScan_Runner(QRunnable):
             #---- Check if cavity not fully up to the goal amplitude
             cav_amp = cav_wrapper.getEPICS_CavityAmp()
             cav_amp_goal = cav_wrapper.getEPICS_CavityAmp()
-            if(abs(cav_amp-cav_amp_goal) > 0.01):
+            check_amp_vs_goal = self.amp_vs_goal_checkbox.isChecked()
+            if(cav_wrapper.getAlias() != "CCL4" and check_amp_vs_goal and abs(cav_amp-cav_amp_goal) > 0.01):
                 time_scan = time.time() - time_start          
                 self.scan_stopper.setShouldStop(False)
                 self.scan_stopper.setIsRunning(False)
@@ -257,6 +259,8 @@ class PhaseScan_Runner(QRunnable):
                 self.signals.scan_data_changed.emit(("status_update",msg_txt))
                 self.signals.scan_data_changed.emit(("table_selection_set",cav_ind))
                 self.signals.scan_data_changed.emit(("table_changed",)) 
+                if(cav_wrapper.getAlias() != "CCL4"):
+                    cav_wrapper.setEPICS_CavityPhase(cav_phase_init)
                 return
             #---- Set all downstream cavities blanked
             self.blankCavities(cav_ind)
@@ -303,7 +307,9 @@ class PhaseScan_Runner(QRunnable):
                 msg_txt += " Run time[sec] = %7.1f"%time_scan                     
                 self.signals.scan_data_changed.emit(("status_update",msg_txt))
                 self.signals.scan_data_changed.emit(("table_selection_set",cav_ind))
-                self.signals.scan_data_changed.emit(("table_changed",)) 
+                self.signals.scan_data_changed.emit(("table_changed",))
+                if(cav_wrapper.getAlias() != "CCL4"):
+                    cav_wrapper.setEPICS_CavityPhase(cav_phase_init)
                 return                
             #--------------
             cavs_count += 1
