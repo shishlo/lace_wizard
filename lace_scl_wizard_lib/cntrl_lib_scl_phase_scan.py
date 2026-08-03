@@ -61,10 +61,6 @@ from .wrappers_cavs_bpms_magnets import Cavity_Wrapper, BPM_Wrapper
 from .phase_scan_lib import ScanStateController, PhaseScan_Runner, ScanWorkerSignals 
 
 #----------------------------------------------------------
-# Custom QtWidgets
-#----------------------------------------------------------
-
-#----------------------------------------------------------
 # Internal Sub - Controller for SCL Phase Scan.
 # The parent is SCL Phase Scan and Analysis.
 #----------------------------------------------------------
@@ -430,6 +426,46 @@ class StopScan_Action:
         self.scan_stopper.setShouldStop(True)
         #print ("debug Stops the phase scans. ")
 
+class SetUpBPM_Min_Amp_Action:
+    """ 
+    By applying minimal BPM amplitude, it will define 
+    what BPMs will be used for analysis.
+    """
+    def __init__(self,bottom_panel_cntrl):
+        self.bottom_panel_cntrl = bottom_panel_cntrl
+        self.cavs_scan_cntrl = self.bottom_panel_cntrl.cavs_scan_cntrl
+        self.cavs_phase_scan_cntrl = self.cavs_scan_cntrl.cavs_phase_scan_cntrl        
+        self.lace_scl_wizard = self.cavs_phase_scan_cntrl.lace_scl_wizard
+        self.cav_wrappers = self.lace_scl_wizard.getCavWrappers()
+        self.bpm_wrappers = self.lace_scl_wizard.getBPM_Wrappers()
+        self.bpm_min_amp_spin_box = self.bottom_panel_cntrl.bpm_min_amp_spin_box
+
+    def performAction(self):
+        cav_wrapper_init = self.cavs_scan_cntrl.bpms_use_table_model.cav_wrapper
+        min_bpm_amp_limit = self.bpm_min_amp_spin_box.value()
+        for cav_wrapper in self.cav_wrappers:
+            bpm_use_arr = cav_wrapper.bpm_wrappers_useInPhaseAnalysis
+            for bpm_ind in range(len(bpm_use_arr)):
+                bpm_use_arr[bpm_ind] = True
+            cav_pos = cav_wrapper.getPosition()
+            for bpm_ind,bpm_wrapper in enumerate(self.bpm_wrappers):
+                result = (not cav_wrapper.isGood)
+                result = result or (not cav_wrapper.isMeasured)
+                result = result or (not bpm_wrapper.isGood)
+                result = result or (bpm_wrapper.getPosition() < cav_pos)
+                if(result):
+                    bpm_use_arr[bpm_ind] = False
+                    continue
+                bpm_alias = bpm_wrapper.getAlias()
+                (funcAmp,funcPhase) = cav_wrapper.bpm_amp_phase_dict[bpm_alias]
+                min_bpm_amp = funcAmp.getMinY()
+                if(min_bpm_amp < min_bpm_amp_limit):
+                    bpm_use_arr[bpm_ind] = False
+                    continue
+        #-------------------
+        if(cav_wrapper_init != None):
+            self.cavs_scan_cntrl.bpms_use_table_model.setCavWrapper(cav_wrapper_init)
+        
 #----------------------------------------------------------
 #  Sub-panels for knobs and tables
 #----------------------------------------------------------
@@ -644,6 +680,9 @@ class BottomScanPanelCntrl:
         bpm_min_amp_button = QPushButton(text="Apply BPM Amp. Limit",parent=None)
         bpm_min_amp_button.setStyleSheet(buttons_style)
         bpm_min_amp_button.adjustSize()
+        
+        setUpBPM_Min_Amp_Action = SetUpBPM_Min_Amp_Action(self)
+        bpm_min_amp_button.clicked.connect(lambda: setUpBPM_Min_Amp_Action.performAction())
         
         bpm_limit_hlayout.addWidget(bpm_amp_limits_label)
         bpm_limit_hlayout.addWidget(self.bpm_min_amp_spin_box)

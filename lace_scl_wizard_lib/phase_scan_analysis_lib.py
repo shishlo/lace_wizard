@@ -104,7 +104,6 @@ class Analysis_Runner(QRunnable):
         cav_stop = self.cav_wrappers[-1].getAlias()
         msg_txt = "Analysis started with cvity = " + cav_start + " to " + cav_stop
         self.signals.analysis_data_changed.emit(("status_update",msg_txt))
-        min_bpm_amp = self.bpm_min_amp_spin_box.value()
         iter_count = 0
         time_start = time.time()
         cavs_count = 0
@@ -358,7 +357,6 @@ class Analysis_Runner(QRunnable):
         All downstream cavities are blanked. For each phase of active cavity 
         calculate the energy as this phase.
         """
-        min_bpm_amp = self.bpm_min_amp_spin_box.value()
         #---- bpm_amp_phase_dic[BPM_Wrapper.getAlias()] = (FunctionAmp,FunctionPhase)
         bpm_amp_phase_dict = cav_wrapper.bpm_amp_phase_dict
         #---- Collecting only BPMs with good data 
@@ -367,10 +365,17 @@ class Analysis_Runner(QRunnable):
         for bpm_wrapper_ind, bpm_wrapper in enumerate(cav_wrapper.bpm_wrappers):          
             (bpm_amp_func,bpm_phase_func) = bpm_amp_phase_dict[bpm_wrapper.getAlias()]
             bpm_amp_min = bpm_amp_func.getMinY()
+            """
+            #---- User should eliminate BPMs with small amplitudes in Phase Scan screen
+            #---- by using the button "Apply BPM Amp. Limit", so we do not need this part here.
+            min_bpm_amp = self.bpm_min_amp_spin_box.value()
             bpm_wrappers_useInPhaseAnalysis[bpm_wrapper_ind] = False
             if(bpm_wrapper.isGood and (bpm_amp_min > min_bpm_amp) and bpm_wrapper.getPosition() > cav_wrapper.getPosition()):
                 bpm_wrappers.append(bpm_wrapper)
                 bpm_wrappers_useInPhaseAnalysis[bpm_wrapper_ind] = True
+            """
+            if(bpm_wrappers_useInPhaseAnalysis[bpm_wrapper_ind]):
+                bpm_wrappers.append(bpm_wrapper)
         #-----------------------------------------------
         if(eKin_out_local_func == None):
             eKin_out_local_func = Function()

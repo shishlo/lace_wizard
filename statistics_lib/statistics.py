@@ -356,6 +356,9 @@ def fitHarmonicData(phase_func,phase_fit_func = None):
                 phase_max_pos = phase1                
         #----------------
         deriv_0 = deriv_1
+        
+    if(phase_min_pos == None): phase_min_pos = 0.
+    if(phase_max_pos == None): phase_max_pos = 0.
 
     phase_min_pos = phaseNearTargetPhaseDeg(phase_min_pos,0.)
     phase_max_pos = phaseNearTargetPhaseDeg(phase_max_pos,0.)
@@ -382,7 +385,7 @@ def findCosLikeMinPhasePos(harmonic_data,harmonic_deriv_data,phase_guess):
     v0 = harmonic_deriv_data.fitValueY(phase_0)
     v1 = harmonic_deriv_data.fitValueY(phase_1)
     if(v1*v0 >= 0.):
-        print ("debug problem with finding the min of the phase-scan. findCosLikeMinPhasePos(...)")
+        #print ("debug problem with finding the min of the phase-scan. findCosLikeMinPhasePos(...)")
         phase_step = 0.01
         min_pos = 0.
         min_val = 1.0e+46
@@ -422,7 +425,7 @@ def findCosLikeMaxPhasePos(harmonic_data,harmonic_deriv_data,phase_guess):
     v0 = harmonic_deriv_data.fitValueY(phase_0)
     v1 = harmonic_deriv_data.fitValueY(phase_1)
     if(v1*v0 >= 0.):
-        print ("debug problem with finding the max of the phase-scan. findCosLikeMaxPhasePos(...)")
+        #print ("debug problem with finding the max of the phase-scan. findCosLikeMaxPhasePos(...)")
         phase_step = 0.1
         max_pos = 0.
         max_val = -1.0e+46
