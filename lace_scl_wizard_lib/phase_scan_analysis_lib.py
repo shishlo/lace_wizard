@@ -109,6 +109,7 @@ class Analysis_Runner(QRunnable):
         cavs_count = 0
         #self.signals.analysis_data_changed.emit(("table_selection_clear",))
         for cav_local_ind,cav_wrapper in enumerate(self.cav_wrappers):
+            #print ("debug cav=",cav_wrapper.getAlias())
             #---- cav index in the global table
             cav_ind = self.cavs_data_analysis_table_model.cav_wrappers.index(cav_wrapper)
             #---- 
@@ -176,7 +177,20 @@ class Analysis_Runner(QRunnable):
             if(cav_start.find("CCL") >= 0):
                 eKin_in_guess = 185.6
             #---- calculation of cav_wrapper.eKin_out_func from BPMs' data
-            self.phaseScanAnalysis(eKin_in_guess,cav_wrapper,cav_wrapper.eKin_out_func)
+            result = self.phaseScanAnalysis(eKin_in_guess,cav_wrapper,cav_wrapper.eKin_out_func)
+            if(result == None):
+                time_scan = time.time() - time_start          
+                self.analysis_stopper.setShouldStop(False)
+                self.analysis_stopper.setIsRunning(False)
+                self.cleanAllDownstreamCavities(cav_wrapper)
+                msg_txt  = "Analysis stopped. No scan data for cavity="
+                msg_txt += cav_wrapper.getAlias()
+                msg_txt += " Cannot continue."
+                msg_txt += " Run time[sec] = %7.0f"%time_scan                     
+                self.signals.analysis_data_changed.emit(("status_update",msg_txt))
+                self.signals.analysis_data_changed.emit(("table_selection_set",cav_ind))
+                self.signals.analysis_data_changed.emit(("table_changed",)) 
+                return                
             #------------------------------------------------------------------
             #---- Performing analysis - from here we assume that cav_wrapper
             #---- has eKin_out_func with data eKinOut vs cavity phase
@@ -374,8 +388,14 @@ class Analysis_Runner(QRunnable):
                 bpm_wrappers.append(bpm_wrapper)
                 bpm_wrappers_useInPhaseAnalysis[bpm_wrapper_ind] = True
             """
-            if(bpm_wrappers_useInPhaseAnalysis[bpm_wrapper_ind]):
+            res = bpm_wrappers_useInPhaseAnalysis[bpm_wrapper_ind]
+            res = res and (bpm_wrapper.getPosition() > cav_wrapper.getPosition())
+            res = res and (bpm_phase_func.getSize() > 3)
+            if(res):
                 bpm_wrappers.append(bpm_wrapper)
+        #-----------------------------------------------
+        if(len(bpm_wrappers) == 0):
+            return None
         #-----------------------------------------------
         if(eKin_out_local_func == None):
             eKin_out_local_func = Function()
