@@ -233,8 +233,8 @@ class PhaseScan_Runner(QRunnable):
                 time_scan = time.time() - time_start
                 one_cav_time = time_scan/cavs_count
                 eta_time = one_cav_time*(len(self.cav_wrappers) - cavs_count)
-                msg_txt += "    Run time[sec] = %7.1f    "%time_scan
-                msg_txt += " ETA = %7.1f"%eta_time            
+                msg_txt += "    Run time[sec] = %7.0f    "%time_scan
+                msg_txt += " ETA = %7.0f"%eta_time            
             self.signals.scan_data_changed.emit(("status_update",msg_txt))
             if(cav_wrapper.isGood == False): 
                 cav_wrapper.isMeasured = False
@@ -255,7 +255,7 @@ class PhaseScan_Runner(QRunnable):
                 msg_txt += cav_wrapper.getAlias()
                 msg_txt += " Amp != AmpGoal   "
                 msg_txt += " %6.3f != %6.3f "%(cav_amp,cav_amp_goal)
-                msg_txt += "  Run time[sec] = %7.1f"%time_scan                     
+                msg_txt += "  Run time[sec] = %7.0f"%time_scan                     
                 self.signals.scan_data_changed.emit(("status_update",msg_txt))
                 self.signals.scan_data_changed.emit(("table_selection_set",cav_ind))
                 self.signals.scan_data_changed.emit(("table_changed",)) 
@@ -278,7 +278,7 @@ class PhaseScan_Runner(QRunnable):
                     msg_txt = "Stopped by user's request at cavity = "
                     msg_txt += cav_wrapper.getAlias()
                     msg_txt += " phase= %+6.1f"%cav_phase
-                    msg_txt += " Run time[sec] = %7.1f"%time_scan
+                    msg_txt += " Run time[sec] = %7.0f"%time_scan
                     self.signals.scan_data_changed.emit(("status_update",msg_txt))
                     self.signals.scan_data_changed.emit(("table_selection_set",cav_ind))
                     return
@@ -304,7 +304,7 @@ class PhaseScan_Runner(QRunnable):
                 msg_txt  = "Scan stopped. Cavity="
                 msg_txt += cav_wrapper.getAlias()
                 msg_txt += " Errors for sin-fiiting are too big! "
-                msg_txt += " Run time[sec] = %7.1f"%time_scan                     
+                msg_txt += " Run time[sec] = %7.0f"%time_scan                     
                 self.signals.scan_data_changed.emit(("status_update",msg_txt))
                 self.signals.scan_data_changed.emit(("table_selection_set",cav_ind))
                 self.signals.scan_data_changed.emit(("table_changed",))
@@ -315,7 +315,7 @@ class PhaseScan_Runner(QRunnable):
             cavs_count += 1
         #--------- END of SCAN
         time_scan = time.time() - time_start
-        msg_txt = "Phase scan finished. Time[sec] = "+"%7.1f"%time_scan
+        msg_txt = "Phase scan finished. Time[sec] = "+"%7.0f"%time_scan
         self.signals.scan_data_changed.emit(("status_update",msg_txt))
         self.signals.scan_data_changed.emit(("table_changed"))
         self.scan_stopper.setShouldStop(False)

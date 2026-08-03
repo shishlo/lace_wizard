@@ -83,7 +83,11 @@ class LACE_SCL_Wizard:
         #-------------------------------------------------------
         #---- data file of the wizard
         self.data_file_name = None
-        
+    
+    def getMainWindow(self):
+        """ Returns the main window of LACE SCL Wizard app. """
+        return self.mainWindow
+
     def getOM(self):
         """ Returns the SCL Online Model instance """
         return self.scl_om

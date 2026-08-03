@@ -42,6 +42,7 @@ from PySide6.QtGui import (
     QIcon,
     QPalette, QColor
     )
+from PySide6.QtWidgets import QFileDialog
 
 import pyqtgraph as pg
 
@@ -672,7 +673,20 @@ class SaveOM_Action:
         model_cav_phase = epics_cav_phase + cav_phase_offset
         cav_phase_offset = model_cav_phase - epics_cav_phase
         """
-        print ("#  cav_name  model_cav_amp   cav_phase_offset  cav_phase_EPICS eKinIn eKinOut eKinOutBPMs cav_amp_EPICS")
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog
+        fileName, _ = QFileDialog.getSaveFileName(
+            self.lace_scl_wizard.getMainWindow(),
+            "Save Online Model Params. to ASCII File",
+            "",
+            "OM Models Parameters (*.omf)", 
+            options=options)
+        if(fileName[-4:] != ".omf"): fileName += ".omf"
+        if fileName == None:
+            return
+        fl_out = open(fileName,"w")
+        st = "#  cav_name  model_cav_amp   cav_phase_offset  cav_phase_EPICS eKinIn eKinOut eKinOutBPMs cav_amp_EPICS"
+        fl_out.write(st + "\n")
         for cav_wrapper in cav_wrappers:
             cav_name = cav_wrapper.getAlias()
             model_cav_amp = cav_wrapper.model_cav.getModelAmp()
@@ -686,11 +700,11 @@ class SaveOM_Action:
             st = cav_name + " %6.4f "%model_cav_amp + " %+7.2f "%cav_phase_offset
             st += " %+7.2f "%cav_phase_EPICS + " %9.3f "%eKin_model_in + " %9.3f "%eKin_model_out + " %9.3f "%eKin_BPM_out
             st += " %8.4f "%cav_amp_EPICS
-            print (st)
+            fl_out.write(st + "\n")
         #---------------------------------
         self.testOnlineModel(cav_wrappers)
-            
-            
+        fl_out.close()
+
     def testOnlineModel(self,cav_wrappers):
         """
         This test will track bunch through the part of the lattice 

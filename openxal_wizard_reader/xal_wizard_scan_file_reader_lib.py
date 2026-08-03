@@ -41,7 +41,7 @@ class XALtoSCL_TuneWizardUpdater:
         #---- The out energy of the cavity is defined by BPMs data
         #-----------------------------------------------------------------
         cav_wrappers = self.lace_scl_wizard.getCavWrappers()
-        for cav_wrapper in cav_wrappers:
+        for cav_ind,cav_wrapper in enumerate(cav_wrappers):
             xal_cavity_wrapper = None
             if(cav_wrapper.getAlias() == "CCL4"):
                 xal_cavity_wrapper = self.scl_scan_reader.getXAL_CavityWrapperDict()["AllOff"]
@@ -56,10 +56,14 @@ class XALtoSCL_TuneWizardUpdater:
             (bpm0_name,bpm1_name) = xal_cavity_wrapper.getBPMs01()
             cav_wrapper.eKin_in = xal_cavity_wrapper.eKin_In()
             cav_wrapper.eKin_out = xal_cavity_wrapper.eKin_Out()
+            if(cav_ind > 0):
+                cav_wrapper.eKin_model_in = cav_wrappers[cav_ind-1].eKin_model_out
             cav_wrapper.eKin_model_out = xal_cavity_wrapper.eKin_Model_Out()
             if(cav_wrapper.getAlias() == "CCL4"):
                 cav_wrapper.eKin_in = 185.6
                 cav_wrapper.eKin_out = 185.6
+                cav_wrapper.eKin_model_in = cav_wrapper.eKin_in
+                cav_wrapper.eKin_model_out = cav_wrapper.eKin_out
             cav_wrapper.eKin_guess = cav_wrapper.eKin_out
             cav_wrapper.synch_acc_phase = xal_cavity_wrapper.realSynchPhase()
             cav_wrapper.synch_real_acc_phase = cav_wrapper.synch_acc_phase
