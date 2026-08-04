@@ -453,6 +453,7 @@ class SetUpBPM_Min_Amp_Action:
                 result = result or (not cav_wrapper.isMeasured)
                 result = result or (not bpm_wrapper.isGood)
                 result = result or (bpm_wrapper.getPosition() < cav_pos)
+                result = result or (bpm_wrapper.getAlias().find("CCL") >= 0)
                 if(result):
                     bpm_use_arr[bpm_ind] = False
                     continue
@@ -818,6 +819,7 @@ class BPMsForAnalysisTableModel(LACE_DataTableModel):
         self.setHorizontalHeaderLabels(headers)
         for bpm_ind,bpm_wrapper in enumerate(self.bpm_wrappers):
             bpm_name_item = QStandardItem(bpm_wrapper.getAlias())
+            bpm_name_item.setEditable(False)
             bpm_good_item = QStandardItem()
             bpm_good_item.setCheckable(False)
             bpm_use_item = QStandardItem()
