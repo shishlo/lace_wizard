@@ -47,6 +47,7 @@ from gui_lib.borderlayout import BorderLayout, Position
 from gui_lib.style_sheets_lib import StyleSheetFactory
 
 from .cntrl_lib_scl_phase_scan import Cavs_Scan_Cntrl
+from .cntrl_lib_scl_phase_scan_bpm_offsets import BPM_Offsets_Cntrl 
 from .cntrl_lib_scl_phase_scan_analysis import Scan_Analysis_Cntrl
 
 #----------------------------------------------------------
@@ -74,11 +75,15 @@ class Cavs_PhaseScan_and_Analisys_Cntrl:
 
         #---- Cavities' scan controller
         self.cavs_scan_cntrl = Cavs_Scan_Cntrl(self)
+        
+        #---- BPM Offsets Controller
+        self.bpm_offsets_cntrl = BPM_Offsets_Cntrl(self)
 
         #---- Scan analysis controller
         self.scan_analysis_cntrl = Scan_Analysis_Cntrl(self)
 
         self.tabs.addTab(self.cavs_scan_cntrl.getMainWidget(),self.cavs_scan_cntrl.getTabName())
+        self.tabs.addTab(self.bpm_offsets_cntrl.getMainWidget(),self.bpm_offsets_cntrl.getTabName())
         self.tabs.addTab(self.scan_analysis_cntrl.getMainWidget(),self.scan_analysis_cntrl.getTabName())
 
         #---- Main window layout

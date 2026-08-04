@@ -1,5 +1,5 @@
 """
-Controller for SCL cavities phase scans. Next, we will analyze the data. 
+Controller for SCL cavities phase scans. Next, we will get BPM Phase Offsets. 
 """
 import sys
 import html
@@ -802,7 +802,7 @@ class CavsScanDataTableModel(LACE_DataTableModel):
         else:
             epics_phase_new_item = self.item(cav_ind,6) ; epics_phase_new_item.setText("%+6.1f"%cav_wrapper.epicsPhase)
             scan_phase_sinAmp_item = self.item(cav_ind,7) ; scan_phase_sinAmp_item.setText("%6.1f"%cav_wrapper.sin_phase_func_amp)
-            scan_phase_errAmp_item = self.item(cav_ind,8) ; scan_phase_errAmp_item.setText("%5.1f"%cav_wrapper.sin_phase_func_amp_err)      
+            scan_phase_errAmp_item = self.item(cav_ind,8) ; scan_phase_errAmp_item.setText("%5.2f"%cav_wrapper.sin_phase_func_amp_err)      
             synch_phase_item = self.item(cav_ind,9) ; synch_phase_item.setText("%+6.1f"%cav_wrapper.synch_acc_phase)
 
 class BPMsForAnalysisTableModel(LACE_DataTableModel):
