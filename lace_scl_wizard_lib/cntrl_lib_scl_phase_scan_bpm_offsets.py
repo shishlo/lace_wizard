@@ -77,14 +77,40 @@ class BPM_Offsets_Cntrl:
         #---- main widget
         self.mainWidget = QFrame(self.cavs_phase_scan_cntrl.tabs)
         #---- tab name
-        self.tab_name = "BPM Offsets"
+        self.tab_name = "BPM Phase Offsets"
         #----
         
         groupBox_style = StyleSheetFactory.groupBoxStyleSheet()
-
+        buttons_style = StyleSheetFactory.pushButtonStyleSheet()
+        
         main_layout = QVBoxLayout()
         main_layout.setSpacing(0)
         main_layout.setContentsMargins(0, 0, 0, 0)
+        
+        ccl_eKin_out_label = QLabel(" CCL4 exit eKin[MeV] = ")
+        self.ccl_eKin_out_spin_box = QDoubleSpinBox()
+        self.ccl_eKin_out_spin_box.setRange(180.0,200.0) # Set min/max range
+        self.ccl_eKin_out_spin_box.setDecimals(3)        # Set precision to 4 decimal places
+        self.ccl_eKin_out_spin_box.setSingleStep(0.01)   # Set step size for arrow buttons
+        self.ccl_eKin_out_spin_box.setValue(185.6)       # Set default value        
+
+        startCCL_calc_Action = StartCCL_Calc_Action(self)
+        startCCL_calc_button = QPushButton("Calculate BPM Pahase Offsets from CCL4 Exit",parent=None)
+        startCCL_calc_button.setStyleSheet(buttons_style)
+        startCCL_calc_button.clicked.connect(lambda: startCCL_calc_Action.performAction())       
+        
+        hor_layout_1 = QHBoxLayout()
+        hor_layout_1.setSpacing(10)
+        hor_layout_1.setContentsMargins(3, 3, 3, 3)
+        hor_layout_1.setAlignment(Qt.AlignLeft)        
+        hor_layout_1.addWidget(ccl_eKin_out_label)
+        hor_layout_1.addWidget(self.ccl_eKin_out_spin_box)
+        hor_layout_1.addWidget(startCCL_calc_button)
+        
+        hor_view_1 = QWidget()
+        hor_view_1 .setLayout(hor_layout_1)
+        
+        main_layout.addWidget(hor_view_1)
         
         self.getMainWidget().setLayout(main_layout)
         
@@ -101,3 +127,25 @@ class BPM_Offsets_Cntrl:
         
     def getBPM_Wrappers(self):
         return self.bpm_wrappers
+
+#----------------------------------------------------------
+# Actions on events with buttons 
+#----------------------------------------------------------
+
+class StartCCL_Calc_Action:
+    """ 
+    Calculates BPM phase offsets using cavities' scan data and 
+    the known (or guess) kinetic energy at the entrance of SCL 
+    (exit CCL4).
+    """
+    def __init__(self,bpm_offsets_cntrl):
+        self.bpm_offsets_cntrl = bpm_offsets_cntrl 
+        self.cavs_phase_scan_cntrl = self.bpm_offsets_cntrl.cavs_phase_scan_cntrl
+        self.lace_scl_wizard = self.cavs_phase_scan_cntrl.lace_scl_wizard
+        self.model_cavs = self.lace_scl_wizard.getOM().getModelCavs()
+        self.cav_wrappers = self.lace_scl_wizard.getCavWrappers()
+        self.bpm_wrappers = self.lace_scl_wizard.getBPM_Wrappers()       
+        self.ccl_eKin_out_spin_box = self.bpm_offsets_cntrl.ccl_eKin_out_spin_box
+        
+    def performAction(self):
+        pass

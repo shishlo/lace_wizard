@@ -141,12 +141,12 @@ class XALtoSCL_TuneWizardUpdater:
                 bpm_wrapper.isGood = xal_isGood
                 bpm_wrapper.setPhaseOffset(xal_phaseOffset)
                 bpm_wrapper.setPhaseOffsetErr(xal_phaseOffsetErr)
-                bpm_wrapper.setOEDA_EPICS_TimeShift(xal_oeda_time_shift)
+                bpm_wrapper.getBPM_TimingBucket().externalUpdateProductionTimeShift(xal_oeda_time_shift)
             else:
                 bpm_wrapper.isGood = False
                 bpm_wrapper.setPhaseOffset(0.)
                 bpm_wrapper.setPhaseOffsetErr(0.)
-                bpm_wrapper.setOEDA_EPICS_TimeShift(0.)
+                bpm_wrapper.getBPM_TimingBucket().externalUpdateProductionTimeShift(0.)
         #-------------------------------------------------------------------
         self.lace_scl_wizard.init_state_cntrl.cavs_data_table_model.tableChanged()
         self.lace_scl_wizard.cavs_phase_scan_cntrl.cavs_scan_cntrl.cavs_data_table_model.tableChanged()

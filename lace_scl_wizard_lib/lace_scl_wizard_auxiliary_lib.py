@@ -8,7 +8,7 @@ import math
 import random
 import time
 
-from orbit_utils import Function
+from orbit.core.orbit_utils import Function
 from orbit.utils import phaseNearTargetPhaseDeg
 
 from orbit.utils.fitting import Solver
@@ -48,7 +48,7 @@ def unWrapPhasesToFunction(func, func_target):
     """
     for ind in range(func.getSize()):
         (x,y,err) = (func.x(ind),func.y(ind),func.err(ind))
-        y = phaseNearTargetPhaseDeg(y,func_target.getY(x)))
+        y = phaseNearTargetPhaseDeg(y,func_target.getY(x))
         func.updatePoint(ind,y,err)
         
 def EstimateBPM_PhaseOffset(bpm_phase_model_func,bpm_phase_epics_func,bpm_amp_epics_func, bpm_amp_cutoff = 0.5):

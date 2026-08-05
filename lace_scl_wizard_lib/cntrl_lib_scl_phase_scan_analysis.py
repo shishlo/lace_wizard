@@ -373,7 +373,6 @@ class SaveParametersOnlineModelPanelCntrl:
         #---- buttons to write to ASCII Online Model paramaters 
         #-----------------------------------------------------------
         saveOM_Action = SaveOM_Action(self)
-        
         saveAllCavs_button = QPushButton("Save Online Model Parameters",parent=None)
         saveAllCavs_button.setStyleSheet(buttons_style)
         saveAllCavs_button.clicked.connect(lambda: saveOM_Action.performAction())
@@ -711,7 +710,7 @@ class SaveOM_Action:
         after initialization to the found model parameters.
         """
         #---- Let's create a copy of the Online Model and use it
-        scl_om = self.scl_om.getCopyOM()
+        scl_om = self.scl_om.getNewOM()
         model_cavs = scl_om.getModelCavs()
         for cav_wrapper in cav_wrappers:
             cav_ind = self.scan_analysis_cntrl.cav_wrappers.index(cav_wrapper)

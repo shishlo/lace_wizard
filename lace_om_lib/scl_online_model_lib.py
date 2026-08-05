@@ -871,8 +871,15 @@ class SCL_Online_Model:
         self.bpms = bpms
         self.model_bpms = model_bpms
 
-    def getCopyOM(self):
-        scl_om = SCL_Online_Model(self.getCopyLatticeDA(),self.getSeqNames(),self.z_step)
+    def getNewOM(self,seqName_arr = None):
+        """
+        Returns a new instance of Online Model. 
+        If seqName_arr == None it will be OM with the same lattice but with
+        design parameters from the initial Data Adaptor(DA).
+        """
+        if(seqName_arr == None):
+            seqName_arr = self.getSeqNames()
+        scl_om = SCL_Online_Model(self.getCopyLatticeDA(),seqName_arr,self.z_step)
         return scl_om
         
     def getSeqNames(self):

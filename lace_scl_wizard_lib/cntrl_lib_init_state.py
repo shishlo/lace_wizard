@@ -326,7 +326,7 @@ class BPMsParamsTableModel(LACE_DataTableModel):
             item = self.item(bpm_ind,2); self._updateBoolItem(bpm_wrapper.isGood,item)
             item = self.item(bpm_ind,3); item.setText("%+6.3f"%bpm_wrapper.getPhaseOffset())
             item = self.item(bpm_ind,4); item.setText("%+6.3f"%bpm_wrapper.getPhaseOffsetErr())
-            item = self.item(bpm_ind,5); item.setText("%+6.3f"%bpm_wrapper.getOEDA_EPICS_TimeShift())
+            item = self.item(bpm_ind,5); item.setText("%+6.3f"%bpm_wrapper.getOEDA_TimeShift())
         
 #----------------------------------------------------------
 # Actions on events with buttons 

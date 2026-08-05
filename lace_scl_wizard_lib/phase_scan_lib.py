@@ -14,8 +14,8 @@ import epics
 
 from PySide6.QtCore import QObject, QRunnable, QThreadPool, QTimer, Slot, Signal
 
-from statistics_lib.statistics import fitCosineFunc, calculateAvgErr
-from statistics_lib.statistics import fitHarmonicData
+from statistics_lib.statistics import calculateAvgErr
+from .lace_scl_wizard_harmonic_fitting_lib import fitCosineFunc, fitHarmonicData
 
 #------------------------------------------------------------------------
 #           Auxiliary SCAN classes and functions
