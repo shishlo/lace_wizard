@@ -157,7 +157,7 @@ class LACE_SCL_Wizard:
             self.mainWindow.setWindowTitle("ESS DTL Wizard - "+str(fileName))
             
     def readOpenXAL_Doc(self):
-        """
+        
         options = QFileDialog.Options()
         options |= QFileDialog.DontUseNativeDialog  
         fileName, _ = QFileDialog.getOpenFileName(
@@ -166,12 +166,13 @@ class LACE_SCL_Wizard:
             "../../..",                             # Directory
             "Scan Data Files (*.sclw)",             # Filter (semicolon-separated)
             options=options)
-        if (not fileName): return
-        """
-        fileName = './openxal_wizard_reader/test_data_2025_09_15.sclw'
+        if (not fileName):
+            #return
+            fileName = './openxal_wizard_reader/test_data_2025_09_15.sclw'
         self.xal_to_scl_tune_wizard_updater = XALtoSCL_TuneWizardUpdater(self)
         self.xal_to_scl_tune_wizard_updater.updateSCL_Tune_Wizard(fileName)
         self.mainWindow.setWindowTitle("Import XAL SCL Wizard Doc: "+str(fileName))
+        
 
 class LACE_SCL_Wizard_MainWindow(QMainWindow):
     def __init__(self, lace_scl_wizard):
