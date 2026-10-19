@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QPlainTextEdit,
     QCheckBox,
     QDoubleSpinBox,
+    QFileDialog,
     QLabel,
     QLineEdit,
     QRadioButton
@@ -125,6 +126,10 @@ class BPMs_State_Cntrl:
         for bpm_ind,model_bpm in enumerate(self.model_bpms):
             bpm_wrapper = BPM_Wrapper(model_bpm)
             self.bpm_wrappers.append(bpm_wrapper)
+        #---- Dictionary bpm_wrapper_dict[bpm_wrapper.alias] = bpm_wrapper
+        self.bpm_wrapper_dict = {}
+        for bpm_wrapper in self.bpm_wrappers:
+            self.bpm_wrapper_dict[bpm_wrapper.alias] = bpm_wrapper
         #---- main widget
         self.mainWidget = QFrame(self.init_state_cntrl.tabs)
         #---- tab name
@@ -140,7 +145,13 @@ class BPMs_State_Cntrl:
 
     def getBPM_Wrappers(self):
         return self.bpm_wrappers
-
+        
+    def getBPM_Wrapper(self,alias):
+        """ Returns bpm_wrapper with alias """
+        if(alias in self.bpm_wrapper_dict):
+            return self.bpm_wrapper_dict[alias]
+        return None
+        
     def dumpCntrlDataToDA(self,parent_da):
         """ Puts this controller data into the Data Adaptor """
         return
@@ -245,8 +256,8 @@ class BPMsDataTableModel(LACE_DataTableModel):
         super().__init__()
         self.init_state_cntrl = init_state_cntrl
         self.lace_scl_wizard = self.init_state_cntrl.lace_scl_wizard
-        self.bpm_state_cntrl = self.init_state_cntrl.bpms_state_cntrl
-        self.bpm_wrappers = self.bpm_state_cntrl.getBPM_Wrappers()
+        self.bpms_state_cntrl = self.init_state_cntrl.bpms_state_cntrl
+        self.bpm_wrappers = self.bpms_state_cntrl.getBPM_Wrappers()
         #---- Sets the headers
         headers = ["BPM", "Pos.[m]","Good",html.unescape("&phi;-Offset")]  
         self.setHorizontalHeaderLabels(headers)
@@ -284,8 +295,8 @@ class BPMsParamsTableModel(LACE_DataTableModel):
         super().__init__()
         self.init_state_cntrl = init_state_cntrl
         self.lace_scl_wizard = self.init_state_cntrl.lace_scl_wizard
-        self.bpm_state_cntrl = self.init_state_cntrl.bpms_state_cntrl
-        self.bpm_wrappers = self.bpm_state_cntrl.getBPM_Wrappers()
+        self.bpms_state_cntrl = self.init_state_cntrl.bpms_state_cntrl
+        self.bpm_wrappers = self.bpms_state_cntrl.getBPM_Wrappers()
         #---- Sets the headers
         #---- OEDA stands for Off Energy Delay Adjustment
         headers = ["BPM", "Pos.[m]","Good",\
@@ -543,14 +554,49 @@ class SetBPM12forSelectedCavs_Action:
         #print ("debug set BPM1 for selected cavs.")
         self.cavs_data_table_model.tableChanged()
         
-class BPMReadPhaseOffset_Action:
+class BPMReadPhaseOffsets_Action:
     """ Read BPM Phase Offsets from external .dat file """ 
     def __init__(self,init_state_cntrl):
         self.init_state_cntrl = init_state_cntrl
         
     def performAction(self):
-        print ("debug read bpm phase offsets")       
+        lace_scl_wizard = self.init_state_cntrl.lace_scl_wizard
+        mainWindow = lace_scl_wizard.mainWindow
+        self.bpms_state_cntrl = self.init_state_cntrl.bpms_state_cntrl
+        self.bpm_wrappers = self.bpms_state_cntrl.getBPM_Wrappers()
+        options = QFileDialog.Options()
+        options |= QFileDialog.DontUseNativeDialog  
+        fileName, _ = QFileDialog.getOpenFileName(
+            mainWindow,                            # Parent widget
+            "Read BPM Phase Offsets from File",    # Caption (dialog title)
+            "../../..",                            # Directory
+            "BPM Offset Data Files (*.dat *.txt)", # Filter (semicolon-separated)
+            options=options)
+        if(len(fileName) != 0):
+            fl_ph_in = open(fileName,"r")
+            lns = fl_ph_in.readlines()[1:]
+            fl_ph_in.close()
+            for ln in lns:
+                res_arr = ln.split()
+                if(len(res_arr) == 5):
+                    bpm_alias = res_arr[1].replace("_Diag","")
+                    phase_offset = float(res_arr[3])
+                    phase_offset_err = float(res_arr[4])
+                    bpm_wrapper = self.bpms_state_cntrl.getBPM_Wrapper(bpm_alias)
+                    if(bpm_wrapper != None):
+                        bpm_wrapper.setPhaseOffset(phase_offset)
+                        bpm_wrapper.setPhaseOffsetErr(phase_offset_err)                 
+        #----- update table
+        self.init_state_cntrl.bpms_params_table_model.tableChanged()      
+       
+class BPMSavePhaseOffsets_Action:
+    """ Save BPM Phase Offsets to an external .dat file """ 
+    def __init__(self,init_state_cntrl):
+        self.init_state_cntrl = init_state_cntrl
         
+    def performAction(self):
+        print ("debug save bpm Phase Offsets")       
+       
 class BPMReadOEDA_Action:
     """ Read BPM OEDA times in [ms] from external .dat file """ 
     #---- OEDA stands for Off Energy Delay Adjustment
@@ -559,26 +605,7 @@ class BPMReadOEDA_Action:
         
     def performAction(self):
         print ("debug read bpm OEDA")
-        
-class BPMReadBoth_Action:
-    """ Read BPM Phase Offsets and OEDA times in [ms] from external .dat file """ 
-    #---- OEDA stands for Off Energy Delay Adjustment
-    def __init__(self,init_state_cntrl):
-        self.init_state_cntrl = init_state_cntrl
-        
-    def performAction(self):
-        print ("debug read bpm Phase Offsets and OEDA")
-        
-class BPMSaveBoth_Action:
-    """ Save BPM Phase Offsets and OEDA times in [ms] to an external .dat file """ 
-    #---- OEDA stands for Off Energy Delay Adjustment
-    def __init__(self,init_state_cntrl):
-        self.init_state_cntrl = init_state_cntrl
-        
-    def performAction(self):
-        print ("debug save bpm Phase Offsets and OEDA")
-        
-        
+
 #----------------------------------------------------------
 # Main Controller for this library
 #----------------------------------------------------------
@@ -731,30 +758,26 @@ class InitState_Cntrl:
         bpmReadPhaseOffset_button = QPushButton(text="Read BPMs' Phase Offsets",parent=None)        
         bpmReadOEDA_button        = QPushButton(text="Read BPMs' OEDA",parent=None)
         bpmReadBoth_button        = QPushButton(text="Read Both",parent=None)
-        bpmSaveBoth_button        = QPushButton(text="Save Both",parent=None)
+        bpmSavePhaseOffsets_button = QPushButton(text="Save BPMs' Phase Offsets",parent=None)
         
         bpmReadPhaseOffset_button.setStyleSheet(buttons_style)
         bpmReadOEDA_button.setStyleSheet(buttons_style)       
-        bpmReadBoth_button.setStyleSheet(buttons_style)
-        bpmSaveBoth_button.setStyleSheet(buttons_style)
+        bpmSavePhaseOffsets_button.setStyleSheet(buttons_style)
         
         #---- cavs button action assignment
-        bpmReadPhaseOffset_Action = BPMReadPhaseOffset_Action(self)
+        bpmReadPhaseOffset_Action = BPMReadPhaseOffsets_Action(self)
         bpmReadOEDA_Action = BPMReadOEDA_Action(self)
-        bpmReadBoth_Action = BPMReadBoth_Action(self)
-        bpmSaveBoth_Action = BPMSaveBoth_Action(self)
+        bpmSavePhaseOffsets_Action = BPMSavePhaseOffsets_Action(self)
         bpmReadPhaseOffset_button.clicked.connect(lambda: bpmReadPhaseOffset_Action.performAction())
-        bpmReadOEDA_button.clicked.connect(lambda: bpmReadOEDA_Action.performAction())  
-        bpmReadBoth_button.clicked.connect(lambda: bpmReadBoth_Action.performAction())     
-        bpmSaveBoth_button.clicked.connect(lambda: bpmSaveBoth_Action.performAction())
+        bpmReadOEDA_button.clicked.connect(lambda: bpmReadOEDA_Action.performAction())    
+        bpmSavePhaseOffsets_button.clicked.connect(lambda: bpmSavePhaseOffsets_Action.performAction())
         
         upper_view = QWidget()
 
         hlayout = QHBoxLayout(upper_view)
         hlayout.addWidget(bpmReadPhaseOffset_button)
         hlayout.addWidget(bpmReadOEDA_button)
-        hlayout.addWidget(bpmReadBoth_button)
-        hlayout.addWidget(bpmSaveBoth_button)
+        hlayout.addWidget(bpmSavePhaseOffsets_button)
         
         #---- Border Layout for self.bpms_state_cntrl tab window
         border_layout = BorderLayout(None)
