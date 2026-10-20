@@ -95,7 +95,7 @@ class BPM_Offsets_Cntrl:
         self.ccl_eKin_out_spin_box.setValue(185.6)       # Set default value        
 
         startCCL_calc_Action = StartCCL_Calc_Action(self)
-        startCCL_calc_button = QPushButton("Calculate BPM Pahase Offsets from CCL4 Exit",parent=None)
+        startCCL_calc_button = QPushButton("Calculate BPM Phase Offsets from CCL4 Exit",parent=None)
         startCCL_calc_button.setStyleSheet(buttons_style)
         startCCL_calc_button.clicked.connect(lambda: startCCL_calc_Action.performAction())       
         
