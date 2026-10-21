@@ -185,6 +185,8 @@ class PhaseScan_Runner(QRunnable):
         phaseDiffBPM01_fit_func = cav_wrapper.phaseDiffBPM01_fit_func
         (sin_amp,avg_value,phase_min_pos,phase_max_pos,func_tmp) = fitHarmonicData(phaseDiffBPM01_func,phaseDiffBPM01_fit_func)
         cav_wrapper.sin_phase_func_amp = sin_amp
+        cav_wrapper.bpm_phase_scan_min_pos = phase_min_pos
+        cav_wrapper.bpm_phase_scan_max_pos = phase_max_pos
         max_err = 0.
         for ind in range(phaseDiffBPM01_func.getSize()):
             diff = abs(phaseDiffBPM01_func.y(ind) - phaseDiffBPM01_fit_func.y(ind))

@@ -67,11 +67,15 @@ class Cavity_Wrapper:
         #---- Results of the sin-like analysis: bpm phases vs. cav. phase, amplitude of sin in degrees 
         self.sin_phase_func_amp = 0.
         self.sin_phase_func_amp_err = 0.
+        self.bpm_phase_scan_min_pos = 0.
+        self,bpm_phase_scan_max_pos = 0.     
         #---- kinetic energies in MeV after analysis of BPMs data based eKinOut vs. cavity EPICS phase
         self.eKin_in = 185.6
         self.eKin_out = 185.6
-        self.eKin_guess = 185.6
-        self.eKin_guess_err = 0.
+        #---- these energies are defined during phase offsets calculations. 
+        #---- Always: eKin_bpm_in = eKin_bpm_out from previous cavity
+        self.eKin_bpm_in = 185.6
+        self.eKin_bpm_out = 185.6
         #---- beam energy for tracking through the whole model from CCL4 -> Cav32d
         self.eKin_model_in = 185.6
         self.eKin_model_out = 185.6       
@@ -137,11 +141,13 @@ class Cavity_Wrapper:
         #---- Results of the sin-like analysis: bpm phases vs. cav. phase, amplitude of sin in degrees 
         self.sin_phase_func_amp = 0.
         self.sin_phase_func_amp_err = 0.
+        self.bpm_phase_scan_min_pos = 0.
+        self.bpm_phase_scan_max_pos = 0. 
         #---- kinetic energies in MeV after analysis of BPMs data based eKinOut vs. cavity EPICS phase
         self.eKin_in = 185.6
         self.eKin_out = 185.6
-        self.eKin_guess = 185.6
-        self.eKin_guess_err = 0.
+        self.eKin_bpm_in = 185.6
+        self.eKin_bpm_out = 185.6
         #---- accelerating phase of the cavity: self.epicsPhase shift from cav. phase for min phase of BPMs
         self.synch_acc_phase = -15.
         self.synch_real_acc_phase = -15.0
