@@ -696,7 +696,7 @@ class SaveOM_Action:
             eKin_model_out = cav_wrapper.eKin_model_out
             eKin_BPM_out = cav_wrapper.eKin_out
             cav_amp_EPICS = cav_wrapper.epicsAmp
-            st = cav_name + " %6.4f "%model_cav_amp + " %+7.2f "%cav_phase_offset
+            st = "SCL:"+cav_name + " %6.4f "%model_cav_amp + " %+7.2f "%cav_phase_offset
             st += " %+7.2f "%cav_phase_EPICS + " %9.3f "%eKin_model_in + " %9.3f "%eKin_model_out + " %9.3f "%eKin_BPM_out
             st += " %8.4f "%cav_amp_EPICS
             fl_out.write(st + "\n")

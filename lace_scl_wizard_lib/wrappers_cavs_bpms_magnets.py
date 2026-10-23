@@ -68,7 +68,7 @@ class Cavity_Wrapper:
         self.sin_phase_func_amp = 0.
         self.sin_phase_func_amp_err = 0.
         self.bpm_phase_scan_min_pos = 0.
-        self,bpm_phase_scan_max_pos = 0.     
+        self.bpm_phase_scan_max_pos = 0.     
         #---- kinetic energies in MeV after analysis of BPMs data based eKinOut vs. cavity EPICS phase
         self.eKin_in = 185.6
         self.eKin_out = 185.6
